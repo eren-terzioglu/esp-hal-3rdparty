@@ -11,7 +11,9 @@
 #include "esp_log.h"
 #include "esp_private/esp_gpio_reserve.h"
 #include "soc/gpio_sig_map.h"
+#ifndef __NuttX__
 #include "driver/gpio.h"
+#endif
 #include "esp_rom_gpio.h"
 #include "esp_phy_init.h"
 #include "esp_private/phy.h"
@@ -23,6 +25,27 @@
 #endif
 
 static const char* TAG = "phy_comm";
+
+#ifdef __NuttX__
+#ifdef CONFIG_IDF_TARGET_ESP32
+#include "esp32_rt_timer.h"
+#define esp_timer_get_time    rt_timer_time_us
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#include "esp32s3_rt_timer.h"
+#define esp_timer_get_time    esp32s3_rt_timer_time_us
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+#include "esp32s2_rt_timer.h"
+#define esp_timer_get_time    rt_timer_time_us
+#else
+#include "esp_hr_timer.h"
+#define esp_timer_get_time          esp_hr_timer_time_us
+#define esp_timer_create            esp_hr_timer_create
+#define esp_timer_start_once        esp_hr_timer_start_once
+#define esp_timer_start_periodic    esp_hr_timer_start_periodic
+#define esp_timer_stop              esp_hr_timer_stop
+#define esp_timer_delete            esp_hr_timer_delete
+#endif
+#endif
 
 static volatile uint16_t s_phy_modem_flag = 0;
 
@@ -149,6 +172,7 @@ void phy_ant_clr_update_flag(void)
     s_phy_ant_need_update_flag = false;
 }
 
+#ifndef __NuttX__
 static void phy_ant_set_gpio_output(uint32_t io_num)
 {
     gpio_config_t io_conf = {};
@@ -199,6 +223,7 @@ esp_err_t esp_phy_get_ant_gpio(esp_phy_ant_gpio_config_t *config)
 
     return ESP_OK;
 }
+#endif
 
 static bool phy_ant_config_check(esp_phy_ant_config_t *config)
 {

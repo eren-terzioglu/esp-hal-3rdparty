@@ -5,7 +5,11 @@
  */
 
 #pragma once
+
+#ifdef __NuttX__
 #include <sys/lock.h>
+#endif
+
 #include "sdkconfig.h"
 #include "esp_phy_init.h"
 #include "soc/soc_caps.h"

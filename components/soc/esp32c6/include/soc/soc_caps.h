@@ -568,9 +568,12 @@
 #define SOC_PM_SUPPORT_MAC_BB_PD        (1)
 #define SOC_PM_SUPPORT_RTC_PERIPH_PD    (1)
 
+/* Temporarily removed since NuttX HAL does not support esp_pm */
+#ifndef __NuttX__
 #define SOC_PM_SUPPORT_PMU_MODEM_STATE  (1)
 /* macro redefine for pass esp_wifi headers md5sum check */
 #define MAC_SUPPORT_PMU_MODEM_STATE     SOC_PM_SUPPORT_PMU_MODEM_STATE
+#endif
 
 #define SOC_PM_SUPPORT_PMU_CLK_ICG          (1)
 

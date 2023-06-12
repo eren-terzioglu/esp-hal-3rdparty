@@ -22,7 +22,9 @@
 #include "soc/syscon_reg.h"
 #include "soc/rtc_periph.h"
 #include "hal/wdt_hal.h"
+#ifndef __NuttX__
 #include "soc/soc_memory_layout.h"
+#endif
 
 #include "esp32s3/rom/cache.h"
 #include "esp32s3/rom/rtc.h"

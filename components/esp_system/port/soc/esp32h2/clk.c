@@ -220,12 +220,14 @@ void rtc_clk_select_rtc_slow_clk(void)
  */
 __attribute__((weak)) void esp_perip_clk_init(void)
 {
+#ifndef __NuttX__
     soc_rtc_slow_clk_src_t rtc_slow_clk_src = rtc_clk_slow_src_get();
     esp_sleep_pd_domain_t pu_domain = (esp_sleep_pd_domain_t)(\
                                                               (rtc_slow_clk_src == SOC_RTC_SLOW_CLK_SRC_XTAL32K) ? ESP_PD_DOMAIN_XTAL32K \
                                                               : (rtc_slow_clk_src == SOC_RTC_SLOW_CLK_SRC_RC32K) ? ESP_PD_DOMAIN_RC32K \
                                                               : ESP_PD_DOMAIN_MAX);
     esp_sleep_pd_config(pu_domain, ESP_PD_OPTION_ON);
+#endif
 
     soc_reset_reason_t rst_reason = esp_rom_get_reset_reason(0);
     if ((rst_reason != RESET_REASON_CPU0_MWDT0) && (rst_reason != RESET_REASON_CPU0_MWDT1)      \

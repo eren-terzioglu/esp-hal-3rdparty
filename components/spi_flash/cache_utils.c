@@ -9,9 +9,11 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#endif
 #include "rom/cache.h"
 
 #if CONFIG_IDF_TARGET_ESP32
@@ -36,7 +38,9 @@
 #include "esp_private/esp_cache_private.h"
 #include "esp_private/cache_utils.h"
 #include "esp_private/spi_flash_os.h"
+#ifndef __NuttX__
 #include "esp_private/freertos_idf_additions_priv.h"
+#endif
 #include "esp_log.h"
 
 static __attribute__((unused)) const char *TAG = "cache";
@@ -64,6 +68,7 @@ static inline bool esp_task_stack_is_sane_cache_disabled(void)
            ;
 }
 
+#ifndef __NuttX__
 void spi_flash_init_lock(void)
 {
     s_flash_op_mutex = xSemaphoreCreateRecursiveMutex();
@@ -324,6 +329,7 @@ void IRAM_ATTR spi_flash_enable_interrupts_caches_no_os(void)
 
 #endif // CONFIG_FREERTOS_UNICORE
 
+#endif // __NuttX__
 
 void IRAM_ATTR spi_flash_enable_cache(uint32_t cpuid)
 {

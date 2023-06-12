@@ -168,11 +168,11 @@ void wps_task(void *pvParameters)
                 break;
 
             case SIG_WPS_RX: {
-                struct wps_rx_param *param = NULL;
-                while ((param = wps_rxq_dequeue()) != NULL) {
-                    wps_sm_rx_eapol_internal(param->sa, param->buf, param->len);
-                    os_free(param->buf);
-                    os_free(param);
+                struct wps_rx_param *p = NULL;
+                while ((p = wps_rxq_dequeue()) != NULL) {
+                    wps_sm_rx_eapol_internal(p->sa, p->buf, p->len);
+                    os_free(p->buf);
+                    os_free(p);
                 }
                 break;
             }
@@ -1086,7 +1086,11 @@ int wps_sm_rx_eapol_internal(u8 *src_addr, u8 *buf, u32 len)
             tmp = (u8 *)(ehdr + 1) + 1;
             ret = wps_process_wps_mX_req(tmp, plen - sizeof(*ehdr) - 1, &res);
             if (res == WPS_FRAGMENT) {
+#ifdef __NuttX__
+                wpa_printf(MSG_DEBUG, "wps frag, silently exit");
+#else
                 wpa_printf(MSG_DEBUG, "wps frag, silently exit", res);
+#endif
                 ret = ESP_OK;
                 break;
             }

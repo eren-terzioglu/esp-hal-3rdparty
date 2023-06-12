@@ -22,7 +22,11 @@
 #include "sys/lock.h"
 #include "esp_log.h"
 #include "esp_check.h"
+#ifdef __NuttX__
+#include <nuttx/spinlock.h>
+#else
 #include "freertos/FreeRTOS.h"
+#endif
 #include "hal/adc_types.h"
 #include "hal/adc_hal_common.h"
 #include "hal/adc_ll.h"
@@ -37,10 +41,25 @@
 #include "esp_efuse_rtc_calib.h"
 #endif
 
-
 static const char *TAG = "adc_share_hw_ctrl";
-extern portMUX_TYPE rtc_spinlock;
+#ifdef __NuttX__
+#define ENTER_CRITICAL_SECTION(lock) do { \
+            assert(g_flags == UINT32_MAX); \
+            g_flags = spin_lock_irqsave(lock); \
+        } while(0)
+#define LEAVE_CRITICAL_SECTION(lock) do { \
+            spin_unlock_irqrestore((lock), g_flags); \
+            g_flags = UINT32_MAX; \
+        } while(0)
+static irqstate_t g_flags = UINT32_MAX;
 
+extern spinlock_t rtc_spinlock;
+#else
+#define ENTER_CRITICAL_SECTION(lock)    portENTER_CRITICAL_SAFE(lock)
+#define LEAVE_CRITICAL_SECTION(lock)    portEXIT_CRITICAL_SAFE(lock)
+
+extern portMUX_TYPE rtc_spinlock;
+#endif
 
 #if SOC_ADC_CALIBRATION_V1_SUPPORTED
 /*---------------------------------------------------------------
@@ -79,11 +98,11 @@ void adc_calc_hw_calibration_code(adc_unit_t adc_n, adc_atten_t atten)
     else {
         ESP_EARLY_LOGD(TAG, "Calibration eFuse is not configured, use self-calibration for ICode");
         sar_periph_ctrl_adc_oneshot_power_acquire();
-        portENTER_CRITICAL(&rtc_spinlock);
+        ENTER_CRITICAL_SECTION(&rtc_spinlock);
         adc_ll_pwdet_set_cct(ADC_LL_PWDET_CCT_DEFAULT);
         const bool internal_gnd = true;
         init_code = adc_hal_self_calibration(adc_n, atten, internal_gnd);
-        portEXIT_CRITICAL(&rtc_spinlock);
+        LEAVE_CRITICAL_SECTION(&rtc_spinlock);
         sar_periph_ctrl_adc_oneshot_power_release();
     }
 #else
@@ -193,7 +212,11 @@ esp_err_t adc2_wifi_release(void)
     return ESP_OK;
 }
 
+#ifdef __NuttX__
+static spinlock_t s_spinlock;
+#else
 static portMUX_TYPE s_spinlock = portMUX_INITIALIZER_UNLOCKED;
+#endif
 
 /*------------------------------------------------------------------------------
 * For those who use APB_SARADC periph
@@ -202,7 +225,7 @@ static int s_adc_digi_ctrlr_cnt;
 
 void adc_apb_periph_claim(void)
 {
-    portENTER_CRITICAL(&s_spinlock);
+    ENTER_CRITICAL_SECTION(&s_spinlock);
     s_adc_digi_ctrlr_cnt++;
     if (s_adc_digi_ctrlr_cnt == 1) {
         ADC_BUS_CLK_ATOMIC() {
@@ -214,12 +237,12 @@ void adc_apb_periph_claim(void)
         }
     }
 
-    portEXIT_CRITICAL(&s_spinlock);
+    LEAVE_CRITICAL_SECTION(&s_spinlock);
 }
 
 void adc_apb_periph_free(void)
 {
-    portENTER_CRITICAL(&s_spinlock);
+    ENTER_CRITICAL_SECTION(&s_spinlock);
     s_adc_digi_ctrlr_cnt--;
     if (s_adc_digi_ctrlr_cnt == 0) {
         ADC_BUS_CLK_ATOMIC() {
@@ -229,10 +252,10 @@ void adc_apb_periph_free(void)
 #endif
         }
     } else if (s_adc_digi_ctrlr_cnt < 0) {
-        portEXIT_CRITICAL(&s_spinlock);
+        LEAVE_CRITICAL_SECTION(&s_spinlock);
         ESP_LOGE(TAG, "%s called, but `s_adc_digi_ctrlr_cnt == 0`", __func__);
         abort();
     }
 
-    portEXIT_CRITICAL(&s_spinlock);
+    LEAVE_CRITICAL_SECTION(&s_spinlock);
 }

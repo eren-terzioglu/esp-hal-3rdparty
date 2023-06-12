@@ -86,7 +86,7 @@ void bootloader_enable_qio_mode(void)
     ESP_LOGD(TAG, "Manufacturer ID 0x%02x chip ID 0x%04x", mfg_id, flash_id);
 
     if ((intptr_t)bootloader_flash_qe_support_list != (intptr_t)bootloader_flash_qe_support_list_default) {
-        ESP_EARLY_LOGD(TAG, "Using overridden bootloader_flash_qio, the list number is %d", bootloader_flash_qe_list_count);
+        ESP_LOGD(TAG, "Using overridden bootloader_flash_qio, the list number is %d", bootloader_flash_qe_list_count);
     }
 
     for (i = 0; i < bootloader_flash_qe_list_count - 1; i++) {

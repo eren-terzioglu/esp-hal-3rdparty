@@ -13,6 +13,10 @@
 #include "sdkconfig.h"
 #include <sys/param.h>
 
+#ifdef __NuttX__
+#define BOOTLOADER_BUILD 1
+#endif
+
 static const char *TAG = "efuse";
 
 // This counter is used to implement independent read access for efuses.
@@ -493,3 +497,7 @@ bool esp_efuse_utility_is_correct_written_data(esp_efuse_block_t block, unsigned
     }
     return correct_written_data;
 }
+
+#ifdef __NuttX__
+#undef BOOTLOADER_BUILD
+#endif

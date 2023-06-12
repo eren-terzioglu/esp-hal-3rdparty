@@ -26,6 +26,10 @@
 #include "mbedtls/des.h"
 #include "mbedtls/ccm.h"
 
+#ifdef __NuttX__
+#include "esp_mbedtls.h"
+#endif
+
 #include "common.h"
 #include "utils/wpabuf.h"
 #include "dh_group5.h"

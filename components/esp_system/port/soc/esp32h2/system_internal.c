@@ -21,6 +21,8 @@
 #include "esp_private/rtc_clk.h"
 #include "soc/rtc_periph.h"
 #include "soc/uart_reg.h"
+#include "hal/cache_hal.h"
+#include "hal/cache_types.h"
 #include "hal/wdt_hal.h"
 #include "hal/spimem_flash_ll.h"
 #include "esp_private/cache_err_int.h"

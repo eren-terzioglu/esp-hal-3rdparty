@@ -11,8 +11,10 @@
 #include "sdkconfig.h"
 #include "esp_check.h"
 #include "esp_log.h"
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
 #include "esp_heap_caps.h"
+#endif
 #include "esp_rom_caps.h"
 #include "soc/soc_caps.h"
 #include "hal/mmu_hal.h"
@@ -183,6 +185,7 @@ void esp_cache_unfreeze_ext_mem_cache(void)
 }
 #endif  //#if SOC_CACHE_FREEZE_SUPPORTED
 
+#ifndef __NuttX__
 //The esp_cache_aligned_malloc function is marked deprecated but also called by other
 //(also deprecated) functions in this file. In order to work around that generating warnings, it's
 //split into a non-deprecated internal function and the stubbed external deprecated function.
@@ -319,3 +322,4 @@ esp_err_t esp_cache_get_alignment(uint32_t heap_caps, size_t *out_alignment)
 
     return ESP_OK;
 }
+#endif
