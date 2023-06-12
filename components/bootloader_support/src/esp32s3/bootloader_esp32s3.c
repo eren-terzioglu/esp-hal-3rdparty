@@ -40,7 +40,11 @@
 #include "hal/cache_hal.h"
 #include "hal/rwdt_ll.h"
 #include "hal/brownout_ll.h"
+#ifndef __NuttX__
 #include "xtensa/config/core.h"
+#else
+#include <arch/xtensa/core.h>
+#endif
 #include "xt_instr_macros.h"
 
 

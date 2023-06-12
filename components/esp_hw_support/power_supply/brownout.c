@@ -108,7 +108,11 @@ void esp_brownout_init(void)
 
 #else // brownout without interrupt
 
+#ifdef __NuttX__
+    static brownout_hal_config_t cfg = {
+#else
     brownout_hal_config_t cfg = {
+#endif
         .threshold = BROWNOUT_DET_LVL,
         .enabled = true,
         .reset_enabled = true,

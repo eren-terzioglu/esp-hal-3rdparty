@@ -213,7 +213,9 @@ static void start_cpu0_default(void)
     s_system_full_inited = true;
 #endif
 
+#ifndef __NuttX__
     esp_startup_start_app();
 
     ESP_INFINITE_LOOP();
+#endif
 }

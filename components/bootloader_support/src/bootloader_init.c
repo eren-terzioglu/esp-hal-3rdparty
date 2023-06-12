@@ -18,7 +18,9 @@
 #include "soc/rtc.h"
 #include "hal/wdt_hal.h"
 #include "hal/efuse_hal.h"
+#ifndef __NuttX__
 #include "esp_bootloader_desc.h"
+#endif
 
 static const char *TAG = "boot";
 
@@ -99,6 +101,7 @@ void bootloader_enable_random(void)
     bootloader_random_enable();
 }
 
+#ifndef __NuttX__
 void bootloader_print_banner(void)
 {
     if (CONFIG_BOOTLOADER_LOG_LEVEL >= ESP_LOG_INFO) {
@@ -117,3 +120,4 @@ void bootloader_print_banner(void)
     ESP_EARLY_LOGI(TAG, "Multicore bootloader");
 #endif
 }
+#endif

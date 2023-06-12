@@ -10,11 +10,15 @@
 #include <stdio.h>
 #include <sys/param.h>  // For MIN/MAX(a, b)
 
+#ifndef __NuttX__
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
+#endif
 #include <soc/soc.h>
+#ifndef __NuttX__
 #include <soc/soc_memory_layout.h>
+#endif
 #include "soc/io_mux_reg.h"
 #include "sdkconfig.h"
 #include "esp_attr.h"
@@ -119,12 +123,27 @@ static __attribute__((unused)) bool is_safe_write_address(size_t addr, size_t si
 }
 
 #if CONFIG_SPI_FLASH_ROM_IMPL
+#ifndef __NuttX__
 #include "esp_heap_caps.h"
+#else
+#include <nuttx/kmalloc.h>
+#endif
 
 void IRAM_ATTR *spi_flash_malloc_internal(size_t size)
 {
+#ifndef __NuttX__
     return heap_caps_malloc(size, MALLOC_CAP_8BIT|MALLOC_CAP_INTERNAL);
+#else
+    return kmm_malloc(size);
+#endif
 }
+
+#ifdef __NuttX__
+void IRAM_ATTR spi_flash_free_internal(void *p)
+{
+    kmm_free(p);
+}
+#endif
 
 void IRAM_ATTR spi_flash_rom_impl_init(void)
 {
@@ -133,8 +152,11 @@ void IRAM_ATTR spi_flash_rom_impl_init(void)
 #if ESP_ROM_HAS_SPI_FLASH_MMAP
     /* These two functions are in ROM only */
     extern void spi_flash_mmap_os_func_set(void *(*func1)(size_t size), void (*func2)(void *p));
+#ifndef __NuttX__
     spi_flash_mmap_os_func_set(spi_flash_malloc_internal, heap_caps_free);
-
+#else
+    spi_flash_mmap_os_func_set(spi_flash_malloc_internal, spi_flash_free_internal);
+#endif
     extern esp_err_t spi_flash_mmap_page_num_init(uint32_t page_num);
     spi_flash_mmap_page_num_init(128);
 #endif // ESP_ROM_HAS_SPI_FLASH_MMAP
@@ -157,6 +179,8 @@ void IRAM_ATTR esp_mspi_pin_init(void)
 #endif
 }
 
+#ifndef __NuttX__
+
 void esp_mspi_pin_reserve(void)
 {
     uint64_t reserve_pin_mask = 0;
@@ -175,6 +199,7 @@ void esp_mspi_pin_reserve(void)
     }
     esp_gpio_reserve(reserve_pin_mask);
 }
+#endif
 
 esp_err_t IRAM_ATTR spi_flash_init_chip_state(void)
 {

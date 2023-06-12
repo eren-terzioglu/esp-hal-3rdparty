@@ -14,6 +14,10 @@
 #include "rom/sha.h"
 #include "sdkconfig.h"
 
+#ifdef __NuttX__
+#include "esp_mbedtls.h"
+#endif
+
 #if NON_OS_BUILD || CONFIG_APP_BUILD_TYPE_RAM
 #if !CONFIG_IDF_TARGET_ESP32
 static SHA_CTX ctx;

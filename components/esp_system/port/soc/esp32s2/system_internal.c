@@ -22,7 +22,12 @@
 #include "soc/syscon_reg.h"
 #include "soc/rtc_periph.h"
 #include "hal/wdt_hal.h"
+#ifndef __NuttX__
 #include "soc/soc_memory_layout.h"
+#include "xtensa/xtensa_api.h"
+#else
+#include "xtensa_api.h"
+#endif
 
 #include "esp32s2/rom/rtc.h"
 

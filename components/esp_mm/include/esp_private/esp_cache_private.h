@@ -10,7 +10,9 @@
 #include "soc/soc_caps.h"
 #include "esp_err.h"
 #include "esp_bit_defs.h"
+#ifndef __NuttX__
 #include "esp_heap_caps.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {

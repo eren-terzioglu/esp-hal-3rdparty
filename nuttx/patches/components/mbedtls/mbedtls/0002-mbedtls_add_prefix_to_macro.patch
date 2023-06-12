@@ -1,0 +1,197 @@
+diff --git a/library/ecdsa.c b/library/ecdsa.c
+index c89c9530dafac6daa8cd9591cc5a7729a1605dc8..671ae37b713330b230dfc6ab993c1356951fb221 100644
+--- a/library/ecdsa.c
++++ b/library/ecdsa.c
+@@ -163,7 +163,7 @@ static void esp_ecdsa_restart_det_free(mbedtls_ecdsa_restart_det_ctx *ctx)
+             if (rs_ctx->SUB == NULL)                                    \
+             return MBEDTLS_ERR_ECP_ALLOC_FAILED;                  \
+                                                                    \
+-            ecdsa_restart_## SUB ##_init(rs_ctx->SUB);                 \
++            esp_ecdsa_restart_## SUB ##_init(rs_ctx->SUB);                 \
+         }                                                                \
+ } while (0)
+ 
+@@ -173,7 +173,7 @@ static void esp_ecdsa_restart_det_free(mbedtls_ecdsa_restart_det_ctx *ctx)
+         if (rs_ctx != NULL && rs_ctx->SUB != NULL &&                     \
+             ret != MBEDTLS_ERR_ECP_IN_PROGRESS)                         \
+         {                                                                \
+-            ecdsa_restart_## SUB ##_free(rs_ctx->SUB);                 \
++            esp_ecdsa_restart_## SUB ##_free(rs_ctx->SUB);                 \
+             esp_mbedtls_free(rs_ctx->SUB);                                 \
+             rs_ctx->SUB = NULL;                                          \
+         }                                                                \
+diff --git a/library/ecp.c b/library/ecp.c
+index 3926b234744c2a365f808cdffe39f6736dda8c50..0316731fe957d14035324389e2b8c7efd1c13667 100644
+--- a/library/ecp.c
++++ b/library/ecp.c
+@@ -287,7 +287,7 @@ int esp_mbedtls_ecp_check_budget(const mbedtls_ecp_group *grp,
+             if (rs_ctx->SUB == NULL)                                       \
+             return MBEDTLS_ERR_ECP_ALLOC_FAILED;                     \
+                                                                       \
+-            ecp_restart_## SUB ##_init(rs_ctx->SUB);                      \
++            esp_ecp_restart_## SUB ##_init(rs_ctx->SUB);                      \
+         }                                                                   \
+ } while (0)
+ 
+@@ -297,7 +297,7 @@ int esp_mbedtls_ecp_check_budget(const mbedtls_ecp_group *grp,
+         if (rs_ctx != NULL && rs_ctx->SUB != NULL &&                        \
+             ret != MBEDTLS_ERR_ECP_IN_PROGRESS)                            \
+         {                                                                   \
+-            ecp_restart_## SUB ##_free(rs_ctx->SUB);                      \
++            esp_ecp_restart_## SUB ##_free(rs_ctx->SUB);                      \
+             esp_mbedtls_free(rs_ctx->SUB);                                    \
+             rs_ctx->SUB = NULL;                                             \
+         }                                                                   \
+diff --git a/library/ecp_curves.c b/library/ecp_curves.c
+index 256f3f90fe254d6840a1bfc2b351c578eeb28b2c..aeed030515affafbfbbab5caaed44b4de427c72f 100644
+--- a/library/ecp_curves.c
++++ b/library/ecp_curves.c
+@@ -4564,7 +4564,7 @@ static int esp_ecp_mod_p384(mbedtls_mpi *);
+ static int esp_ecp_mod_p521(mbedtls_mpi *);
+ #endif
+ 
+-#define NIST_MODP(P)      grp->modp = ecp_mod_ ## P;
++#define NIST_MODP(P)      grp->modp = esp_ecp_mod_ ## P;
+ #else
+ #define NIST_MODP(P)
+ #endif /* MBEDTLS_ECP_NIST_OPTIM */
+@@ -4588,23 +4588,23 @@ static int esp_ecp_mod_p256k1(mbedtls_mpi *);
+ 
+ #if defined(ECP_LOAD_GROUP)
+ #define LOAD_GROUP_A(G)   esp_ecp_group_load(grp,            \
+-                                         G ## _p,  sizeof(G ## _p),   \
+-                                         G ## _a,  sizeof(G ## _a),   \
+-                                         G ## _b,  sizeof(G ## _b),   \
+-                                         G ## _gx, sizeof(G ## _gx),   \
+-                                         G ## _gy, sizeof(G ## _gy),   \
+-                                         G ## _n,  sizeof(G ## _n),   \
+-                                         G ## _T                         \
++                                         esp_ ## G ## _p,  sizeof(esp_ ## G ## _p),   \
++                                         esp_ ## G ## _a,  sizeof(esp_ ## G ## _a),   \
++                                         esp_ ## G ## _b,  sizeof(esp_ ## G ## _b),   \
++                                         esp_ ## G ## _gx, sizeof(esp_ ## G ## _gx),   \
++                                         esp_ ## G ## _gy, sizeof(esp_ ## G ## _gy),   \
++                                         esp_ ## G ## _n,  sizeof(esp_ ## G ## _n),   \
++                                         esp_ ## G ## _T                         \
+                                          )
+ 
+ #define LOAD_GROUP(G)     esp_ecp_group_load(grp,            \
+-                                         G ## _p,  sizeof(G ## _p),   \
++                                         esp_ ## G ## _p,  sizeof(esp_ ## G ## _p),   \
+                                          NULL,     0,                    \
+-                                         G ## _b,  sizeof(G ## _b),   \
+-                                         G ## _gx, sizeof(G ## _gx),   \
+-                                         G ## _gy, sizeof(G ## _gy),   \
+-                                         G ## _n,  sizeof(G ## _n),   \
+-                                         G ## _T                         \
++                                         esp_ ## G ## _b,  sizeof(esp_ ## G ## _b),   \
++                                         esp_ ## G ## _gx, sizeof(esp_ ## G ## _gx),   \
++                                         esp_ ## G ## _gy, sizeof(esp_ ## G ## _gy),   \
++                                         esp_ ## G ## _n,  sizeof(esp_ ## G ## _n),   \
++                                         esp_ ## G ## _T                         \
+                                          )
+ #endif /* ECP_LOAD_GROUP */
+ 
+diff --git a/library/ecp_curves_new.c b/library/ecp_curves_new.c
+index d7cd2c6c8fd603d4e3687ac1dafbbfe30f89ce79..89e94c325197870633b02dec36dc3343faeafb0b 100644
+--- a/library/ecp_curves_new.c
++++ b/library/ecp_curves_new.c
+@@ -4584,7 +4584,7 @@ MBEDTLS_STATIC_TESTABLE
+ int esp_mbedtls_ecp_mod_p521_raw(mbedtls_mpi_uint *N_p, size_t N_n);
+ #endif
+ 
+-#define NIST_MODP(P)      grp->modp = ecp_mod_ ## P;
++#define NIST_MODP(P)      grp->modp = esp_ecp_mod_ ## P;
+ #else
+ #define NIST_MODP(P)
+ #endif /* MBEDTLS_ECP_NIST_OPTIM */
+@@ -4618,23 +4618,23 @@ int esp_mbedtls_ecp_mod_p256k1_raw(mbedtls_mpi_uint *X, size_t X_limbs);
+ 
+ #if defined(ECP_LOAD_GROUP)
+ #define LOAD_GROUP_A(G)   esp_ecp_group_load(grp,            \
+-                                         G ## _p,  sizeof(G ## _p),   \
+-                                         G ## _a,  sizeof(G ## _a),   \
+-                                         G ## _b,  sizeof(G ## _b),   \
+-                                         G ## _gx, sizeof(G ## _gx),   \
+-                                         G ## _gy, sizeof(G ## _gy),   \
+-                                         G ## _n,  sizeof(G ## _n),   \
+-                                         G ## _T                         \
++                                         esp_ ## G ## _p,  sizeof(esp_ ## G ## _p),   \
++                                         esp_ ## G ## _a,  sizeof(esp_ ## G ## _a),   \
++                                         esp_ ## G ## _b,  sizeof(esp_ ## G ## _b),   \
++                                         esp_ ## G ## _gx, sizeof(esp_ ## G ## _gx),   \
++                                         esp_ ## G ## _gy, sizeof(esp_ ## G ## _gy),   \
++                                         esp_ ## G ## _n,  sizeof(esp_ ## G ## _n),   \
++                                         esp_ ## G ## _T                         \
+                                          )
+ 
+ #define LOAD_GROUP(G)     esp_ecp_group_load(grp,            \
+-                                         G ## _p,  sizeof(G ## _p),   \
++                                         esp_ ## G ## _p,  sizeof(esp_ ## G ## _p),   \
+                                          NULL,     0,                    \
+-                                         G ## _b,  sizeof(G ## _b),   \
+-                                         G ## _gx, sizeof(G ## _gx),   \
+-                                         G ## _gy, sizeof(G ## _gy),   \
+-                                         G ## _n,  sizeof(G ## _n),   \
+-                                         G ## _T                         \
++                                         esp_ ## G ## _b,  sizeof(esp_ ## G ## _b),   \
++                                         esp_ ## G ## _gx, sizeof(esp_ ## G ## _gx),   \
++                                         esp_ ## G ## _gy, sizeof(esp_ ## G ## _gy),   \
++                                         esp_ ## G ## _n,  sizeof(esp_ ## G ## _n),   \
++                                         esp_ ## G ## _T                         \
+                                          )
+ #endif /* ECP_LOAD_GROUP */
+ 
+diff --git a/library/md.c b/library/md.c
+index 20a131da4c331fc9505e969b543aaa6246e609c0..1870e1b7d975a2fc37c7c5e26fbc3d67df74c89e 100644
+--- a/library/md.c
++++ b/library/md.c
+@@ -411,7 +411,7 @@ int esp_mbedtls_md_clone(mbedtls_md_context_t *dst,
+         ctx->md_ctx = esp_mbedtls_calloc(1, sizeof(mbedtls_##type##_context)); \
+         if (ctx->md_ctx == NULL)                                       \
+         return MBEDTLS_ERR_MD_ALLOC_FAILED;                      \
+-        mbedtls_##type##_init(ctx->md_ctx);                           \
++        esp_mbedtls_##type##_init(ctx->md_ctx);                           \
+     }                                                                   \
+     while (0)
+ 
+diff --git a/library/oid.c b/library/oid.c
+index 06a7aee5326eedb20ab8794551322a76f9ef0f5f..d1bc2cfa0c6a7f0f13392984aab24e40a0d34e36 100644
+--- a/library/oid.c
++++ b/library/oid.c
+@@ -42,7 +42,7 @@
+  * the other functions)
+  */
+ #define esp_FN_OID_TYPED_FROM_ASN1(TYPE_T, NAME, LIST)                    \
+-    static const TYPE_T *oid_ ## NAME ## _from_asn1(                   \
++    static const TYPE_T *esp_oid_ ## NAME ## _from_asn1(                   \
+         const mbedtls_asn1_buf *oid)     \
+     {                                                                   \
+         const TYPE_T *p = (LIST);                                       \
+@@ -68,7 +68,7 @@
+ #define FN_OID_GET_DESCRIPTOR_ATTR1(FN_NAME, TYPE_T, TYPE_NAME, ATTR1_TYPE, ATTR1) \
+     int FN_NAME(const mbedtls_asn1_buf *oid, ATTR1_TYPE * ATTR1)                  \
+     {                                                                       \
+-        const TYPE_T *data = oid_ ## TYPE_NAME ## _from_asn1(oid);        \
++        const TYPE_T *data = esp_ ## oid_ ## TYPE_NAME ## _from_asn1(oid);        \
+         if (data == NULL) return MBEDTLS_ERR_OID_NOT_FOUND;            \
+         *ATTR1 = data->descriptor.ATTR1;                                    \
+         return 0;                                                        \
+@@ -82,7 +82,7 @@
+ #define FN_OID_GET_ATTR1(FN_NAME, TYPE_T, TYPE_NAME, ATTR1_TYPE, ATTR1) \
+     int FN_NAME(const mbedtls_asn1_buf *oid, ATTR1_TYPE * ATTR1)                  \
+     {                                                                       \
+-        const TYPE_T *data = oid_ ## TYPE_NAME ## _from_asn1(oid);        \
++        const TYPE_T *data = esp_ ## oid_ ## TYPE_NAME ## _from_asn1(oid);        \
+         if (data == NULL) return MBEDTLS_ERR_OID_NOT_FOUND;            \
+         *ATTR1 = data->ATTR1;                                               \
+         return 0;                                                        \
+@@ -97,7 +97,7 @@
+     int FN_NAME(const mbedtls_asn1_buf *oid, ATTR1_TYPE * ATTR1,               \
+                 ATTR2_TYPE * ATTR2)              \
+     {                                                                           \
+-        const TYPE_T *data = oid_ ## TYPE_NAME ## _from_asn1(oid);            \
++        const TYPE_T *data = esp_ ## oid_ ## TYPE_NAME ## _from_asn1(oid);            \
+         if (data == NULL) return MBEDTLS_ERR_OID_NOT_FOUND;                 \
+         *(ATTR1) = data->ATTR1;                                                 \
+         *(ATTR2) = data->ATTR2;                                                 \

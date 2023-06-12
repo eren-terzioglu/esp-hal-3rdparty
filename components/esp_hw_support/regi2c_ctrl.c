@@ -7,23 +7,45 @@
 
 #include "esp_attr.h"
 #include <stdint.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 #include "hal/regi2c_ctrl.h"
 #include "hal/regi2c_ctrl_ll.h"
 #include "esp_hw_log.h"
 #include "soc/soc_caps.h"
 
+#ifdef __NuttX__
+#include <nuttx/spinlock.h>
+#else
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#endif
+
+#ifdef __NuttX__
+#define ENTER_CRITICAL_SECTION(lock) do { \
+            assert(g_flags == UINT32_MAX); \
+            g_flags = spin_lock_irqsave(lock); \
+        } while(0)
+#define LEAVE_CRITICAL_SECTION(lock) do { \
+            spin_unlock_irqrestore((lock), g_flags); \
+            g_flags = UINT32_MAX; \
+        } while(0)
+
+static spinlock_t mux;
+static irqstate_t g_flags = UINT32_MAX;
+#else
+#define ENTER_CRITICAL_SECTION(lock)    portENTER_CRITICAL_SAFE(lock)
+#define LEAVE_CRITICAL_SECTION(lock)    portEXIT_CRITICAL_SAFE(lock)
+
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+#endif
 
 static DRAM_ATTR __attribute__((unused)) const char *TAG = "REGI2C";
 
 uint8_t regi2c_ctrl_read_reg(uint8_t block, uint8_t host_id, uint8_t reg_add)
 {
     REGI2C_CLOCK_ENABLE();
-    portENTER_CRITICAL_SAFE(&mux);
+    ENTER_CRITICAL_SECTION(&mux);
     uint8_t value = regi2c_read_reg_raw(block, host_id, reg_add);
-    portEXIT_CRITICAL_SAFE(&mux);
+    LEAVE_CRITICAL_SECTION(&mux);
     REGI2C_CLOCK_DISABLE();
     return value;
 }
@@ -31,9 +53,9 @@ uint8_t regi2c_ctrl_read_reg(uint8_t block, uint8_t host_id, uint8_t reg_add)
 uint8_t regi2c_ctrl_read_reg_mask(uint8_t block, uint8_t host_id, uint8_t reg_add, uint8_t msb, uint8_t lsb)
 {
     REGI2C_CLOCK_ENABLE();
-    portENTER_CRITICAL_SAFE(&mux);
+    ENTER_CRITICAL_SECTION(&mux);
     uint8_t value = regi2c_read_reg_mask_raw(block, host_id, reg_add, msb, lsb);
-    portEXIT_CRITICAL_SAFE(&mux);
+    LEAVE_CRITICAL_SECTION(&mux);
     REGI2C_CLOCK_DISABLE();
     return value;
 }
@@ -41,29 +63,29 @@ uint8_t regi2c_ctrl_read_reg_mask(uint8_t block, uint8_t host_id, uint8_t reg_ad
 void regi2c_ctrl_write_reg(uint8_t block, uint8_t host_id, uint8_t reg_add, uint8_t data)
 {
     REGI2C_CLOCK_ENABLE();
-    portENTER_CRITICAL_SAFE(&mux);
+    ENTER_CRITICAL_SECTION(&mux);
     regi2c_write_reg_raw(block, host_id, reg_add, data);
-    portEXIT_CRITICAL_SAFE(&mux);
+    LEAVE_CRITICAL_SECTION(&mux);
     REGI2C_CLOCK_DISABLE();
 }
 
 void regi2c_ctrl_write_reg_mask(uint8_t block, uint8_t host_id, uint8_t reg_add, uint8_t msb, uint8_t lsb, uint8_t data)
 {
     REGI2C_CLOCK_ENABLE();
-    portENTER_CRITICAL_SAFE(&mux);
+    ENTER_CRITICAL_SECTION(&mux);
     regi2c_write_reg_mask_raw(block, host_id, reg_add, msb, lsb, data);
-    portEXIT_CRITICAL_SAFE(&mux);
+    LEAVE_CRITICAL_SECTION(&mux);
     REGI2C_CLOCK_DISABLE();
 }
 
 void regi2c_enter_critical(void)
 {
-    portENTER_CRITICAL_SAFE(&mux);
+    ENTER_CRITICAL_SECTION(&mux);
 }
 
 void regi2c_exit_critical(void)
 {
-    portEXIT_CRITICAL_SAFE(&mux);
+    LEAVE_CRITICAL_SECTION(&mux);
 }
 
 /**
