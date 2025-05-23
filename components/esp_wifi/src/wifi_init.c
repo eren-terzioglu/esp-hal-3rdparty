@@ -494,7 +494,9 @@ esp_err_t esp_wifi_init(const wifi_init_config_t *config)
     esp_wifi_beacon_offset_configure(&offset_config);
 #endif
 
+#ifndef __NuttX__
     adc2_cal_include(); //This enables the ADC2 calibration constructor at start up.
+#endif
 
     esp_wifi_config_info();
 

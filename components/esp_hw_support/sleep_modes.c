@@ -100,7 +100,9 @@
 #elif CONFIG_IDF_TARGET_ESP32S2
 #include "esp32s2/rom/rtc.h"
 #include "soc/extmem_reg.h"
+#ifndef __NuttX__
 #include "esp_private/gpio.h"
+#endif
 #elif CONFIG_IDF_TARGET_ESP32S3
 #include "esp32s3/rom/rtc.h"
 #elif CONFIG_IDF_TARGET_ESP32C3
