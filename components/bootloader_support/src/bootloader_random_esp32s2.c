@@ -16,7 +16,7 @@
 #include "esp_private/regi2c_ctrl.h"
 #include "hal/adc_ll.h"
 
-#if defined(CONFIG_ESPRESSIF_SIMPLE_BOOT) || defined(CONFIG_ESPRESSIF_MCUBOOT)
+#if defined(CONFIG_ESPRESSIF_SIMPLE_BOOT) || defined(CONFIG_ESPRESSIF_BOOTLOADER_MCUBOOT)
 #define BOOTLOADER_BUILD 1
 #endif
 
