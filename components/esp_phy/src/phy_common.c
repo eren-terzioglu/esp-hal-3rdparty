@@ -135,24 +135,14 @@ void phy_track_pll_init(void)
             .callback = &phy_track_pll_timer_callback,
             .name = "phy-track-pll-timer"
     };
-#ifndef __NuttX__
     ESP_ERROR_CHECK(esp_timer_create(&phy_track_pll_timer_args, &phy_track_pll_timer));
     ESP_ERROR_CHECK(esp_timer_start_periodic(phy_track_pll_timer, PHY_TRACK_PLL_PERIOD_IN_US));
-#else
-    esp_timer_create(&phy_track_pll_timer_args, &phy_track_pll_timer);
-    esp_timer_start_periodic(phy_track_pll_timer, PHY_TRACK_PLL_PERIOD_IN_US);
-#endif
 }
 
 void phy_track_pll_deinit(void)
 {
-#ifndef __NuttX__
     ESP_ERROR_CHECK(esp_timer_stop(phy_track_pll_timer));
     ESP_ERROR_CHECK(esp_timer_delete(phy_track_pll_timer));
-#else
-    esp_timer_stop(phy_track_pll_timer);
-    esp_timer_delete(phy_track_pll_timer);
-#endif
 }
 
 void phy_set_modem_flag(esp_phy_modem_t modem)
