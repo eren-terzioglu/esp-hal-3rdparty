@@ -9,11 +9,28 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "sdkconfig.h"
+
 #ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#else
+#include <nuttx/arch.h>
+#include <nuttx/init.h>
+#include <nuttx/sched.h>
+#include <sched/sched.h>
+#include <nuttx/mutex.h>
+#if defined(CONFIG_IDF_TARGET_ESP32)
+#  include "esp32_irq.h"
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+#  include "esp32s2_irq.h"
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#  include "esp32s3_irq.h"
+#else
+#  include "esp_irq.h"
 #endif
+#endif  // __NuttX__
 #include "rom/cache.h"
 
 #if CONFIG_IDF_TARGET_ESP32
@@ -27,7 +44,6 @@
 #include "hal/cache_hal.h"
 #include "hal/cache_ll.h"
 #include <soc/soc.h>
-#include "sdkconfig.h"
 #ifndef CONFIG_FREERTOS_UNICORE
 #include "esp_private/esp_ipc.h"
 #endif
@@ -43,20 +59,48 @@
 #endif
 #include "esp_log.h"
 
+#if defined(CONFIG_IDF_TARGET_ESP32)
+#  define esp_intr_noniram_disable  esp32_irq_noniram_disable
+#  define esp_intr_noniram_enable   esp32_irq_noniram_enable
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+#  define esp_intr_noniram_disable() do {} while(0);
+#  define esp_intr_noniram_enable() do {} while(0);
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#  define esp_intr_noniram_disable  esp32s3_irq_noniram_disable
+#  define esp_intr_noniram_enable   esp32s3_irq_noniram_enable
+#endif
+
+#ifdef __NuttX__
+#  define xPortGetCoreID     this_cpu
+#  define SemaphoreHandle_t  mutex_t
+#endif 
+
 static __attribute__((unused)) const char *TAG = "cache";
 
 // Used only on ROM impl. in idf, this param unused, cache status hold by hal
 static uint32_t s_flash_op_cache_state[2];
 
+pthread_cond_t g_gpu_prepare_cond;
+pthread_mutex_t g_cpu_cond_lock;
 
 #ifndef CONFIG_FREERTOS_UNICORE
 static SemaphoreHandle_t s_flash_op_mutex;
+#ifndef __NuttX__
 static volatile bool s_flash_op_can_start = false;
 static volatile bool s_flash_op_complete = false;
+#else
+volatile bool s_flash_op_can_start = false;
+volatile bool s_flash_op_complete = false;
+sem_t g_cpu_prepare_sem[CONFIG_SMP_NCPUS] = {
+    NXSEM_INITIALIZER(0, 0),
+    NXSEM_INITIALIZER(0, 0)
+};
+#endif
 #ifndef NDEBUG
 static volatile int s_flash_op_cpu = -1;
 #endif
 
+#ifndef __NuttX__
 static inline bool esp_task_stack_is_sane_cache_disabled(void)
 {
     const void *sp = (const void *)esp_cpu_get_sp();
@@ -67,23 +111,36 @@ static inline bool esp_task_stack_is_sane_cache_disabled(void)
 #endif
            ;
 }
+#endif
 
-#ifndef __NuttX__
 void spi_flash_init_lock(void)
 {
+#ifndef __NuttX__
     s_flash_op_mutex = xSemaphoreCreateRecursiveMutex();
     assert(s_flash_op_mutex != NULL);
+#else
+    nxmutex_init(&s_flash_op_mutex);
+#endif
 }
 
 void spi_flash_op_lock(void)
 {
+#ifndef __NuttX__
     xSemaphoreTakeRecursive(s_flash_op_mutex, portMAX_DELAY);
+#else
+    nxmutex_lock(&s_flash_op_mutex);
+#endif
 }
 
 void spi_flash_op_unlock(void)
 {
+#ifndef __NuttX__
     xSemaphoreGiveRecursive(s_flash_op_mutex);
+#else
+    nxmutex_unlock(&s_flash_op_mutex);
+#endif
 }
+
 /*
  If you're going to modify this, keep in mind that while the flash caches of the pro and app
  cpu are separate, the psram cache is *not*. If one of the CPUs returns from a flash routine
@@ -91,6 +148,7 @@ void spi_flash_op_unlock(void)
  when accessing psram from the former CPU.
 */
 
+#ifndef __NuttX__
 void IRAM_ATTR spi_flash_op_block_func(void *arg)
 {
     // Disable scheduler on this CPU
@@ -126,9 +184,11 @@ void IRAM_ATTR spi_flash_op_block_func(void *arg)
     xTaskResumeAll();
 #endif // #if ( ( CONFIG_FREERTOS_SMP ) && ( !CONFIG_FREERTOS_UNICORE ) )
 }
+#endif  // __NuttX__
 
 void IRAM_ATTR spi_flash_disable_interrupts_caches_and_other_cpu(void)
 {
+#ifndef __NuttX__
     assert(esp_task_stack_is_sane_cache_disabled());
 
     spi_flash_op_lock();
@@ -195,10 +255,34 @@ void IRAM_ATTR spi_flash_disable_interrupts_caches_and_other_cpu(void)
     //only needed if cache(s) is per core
     spi_flash_disable_cache(other_cpuid, &s_flash_op_cache_state[other_cpuid]);
 #endif
+#else
+    int cpuid = this_cpu();
+    uint32_t other_cpuid = (cpuid == 0) ? 1 : 0;
+
+    spi_flash_op_lock();
+
+    if (OSINIT_OS_READY()) {
+        /* Signal the other CPU to suspend interrupts and cache */
+
+        s_flash_op_can_start = false;
+
+        nxsem_post(&g_cpu_prepare_sem[other_cpuid]);
+        while (!s_flash_op_can_start) {
+              /* Busy loop and wait for spi_flash_op_block_task to disable
+               * interrupts and cache on the other CPU.
+               */
+          }
+
+        sched_lock();
+        esp_intr_noniram_disable();
+    }
+    spi_flash_disable_cache(cpuid, &s_flash_op_cache_state[cpuid]);
+#endif // __NuttX__
 }
 
 void IRAM_ATTR spi_flash_enable_interrupts_caches_and_other_cpu(void)
 {
+#ifndef __NuttX__
     const int cpuid = xPortGetCoreID();
 
 #ifndef NDEBUG
@@ -241,6 +325,23 @@ void IRAM_ATTR spi_flash_enable_interrupts_caches_and_other_cpu(void)
     }
     // Release API lock
     spi_flash_op_unlock();
+#else
+    int cpuid = this_cpu();
+    uint32_t other_cpuid = (cpuid == 0) ? 1 : 0;
+
+    spi_flash_restore_cache(cpuid, s_flash_op_cache_state[cpuid]);
+#if SOC_IDCACHE_PER_CORE
+    //only needed if cache(s) is per core
+    spi_flash_restore_cache(other_cpuid, s_flash_op_cache_state[other_cpuid]);
+#endif
+
+    if (OSINIT_OS_READY()) {
+        s_flash_op_complete = true;
+        esp_intr_noniram_enable();
+        sched_unlock();
+    }
+    spi_flash_op_unlock();
+#endif  // __NuttX__
 }
 
 void IRAM_ATTR spi_flash_disable_interrupts_caches_and_other_cpu_no_os(void)
@@ -259,21 +360,21 @@ void IRAM_ATTR spi_flash_disable_interrupts_caches_and_other_cpu_no_os(void)
 void IRAM_ATTR spi_flash_enable_interrupts_caches_no_os(void)
 {
     const uint32_t cpuid = xPortGetCoreID();
-
     // Re-enable cache on this CPU
     spi_flash_restore_cache(cpuid, s_flash_op_cache_state[cpuid]);
     // Re-enable non-iram interrupts
     esp_intr_noniram_enable();
 }
-
 #else // CONFIG_FREERTOS_UNICORE
 
 void spi_flash_init_lock(void)
 {
+
 }
 
 void spi_flash_op_lock(void)
 {
+#ifndef __NuttX__
 #if ( ( CONFIG_FREERTOS_SMP ) && ( !CONFIG_FREERTOS_UNICORE ) )
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
         //Note: Scheduler suspension behavior changed in FreeRTOS SMP
@@ -282,10 +383,16 @@ void spi_flash_op_lock(void)
 #else
     vTaskSuspendAll();
 #endif // #if ( ( CONFIG_FREERTOS_SMP ) && ( !CONFIG_FREERTOS_UNICORE ) )
+#else
+    if (OSINIT_OS_READY()) {
+        sched_lock();
+    }
+#endif // __NuttX__
 }
 
 void spi_flash_op_unlock(void)
 {
+#ifndef __NuttX__
 #if ( ( CONFIG_FREERTOS_SMP ) && ( !CONFIG_FREERTOS_UNICORE ) )
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
         //Note: Scheduler suspension behavior changed in FreeRTOS SMP
@@ -294,6 +401,11 @@ void spi_flash_op_unlock(void)
 #else
     xTaskResumeAll();
 #endif // #if ( ( CONFIG_FREERTOS_SMP ) && ( !CONFIG_FREERTOS_UNICORE ) )
+#else
+    if (OSINIT_OS_READY()) {
+        sched_unlock();
+    }
+#endif // __NuttX__
 }
 
 
@@ -328,8 +440,6 @@ void IRAM_ATTR spi_flash_enable_interrupts_caches_no_os(void)
 }
 
 #endif // CONFIG_FREERTOS_UNICORE
-
-#endif // __NuttX__
 
 void IRAM_ATTR spi_flash_enable_cache(uint32_t cpuid)
 {

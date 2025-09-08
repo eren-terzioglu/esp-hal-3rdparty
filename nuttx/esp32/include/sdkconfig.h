@@ -315,6 +315,14 @@
 
 #define CONFIG_ESP_PHY_ENABLED 1
 
+#define CONFIG_SPI_FLASH_PLACE_FUNCTIONS_IN_IRAM 1
+#define CONFIG_SPI_FLASH_BROWNOUT_RESET 1
+#define CONFIG_SPI_FLASH_SUPPORT_XMC_CHIP 1
+#define CONFIG_SPI_FLASH_SUPPORT_GD_CHIP 1
+#define CONFIG_SPI_FLASH_SUPPORT_ISSI_CHIP 1
+#define CONFIG_SPI_FLASH_SUPPORT_MXIC_CHIP 1
+#define CONFIG_SPI_FLASH_SUPPORT_WINBOND_CHIP 1
+
 /* Configurations for NuttX */
 
 /* Configuration from the original `sdkconfig.h` may be overriden here.
@@ -574,6 +582,7 @@
 
 #ifndef CONFIG_SMP
 #  define CONFIG_ESP_SYSTEM_SINGLE_CORE_MODE 1
+#  define CONFIG_FREERTOS_UNICORE 1
 #endif
 
 /* SPI Flash related configs */

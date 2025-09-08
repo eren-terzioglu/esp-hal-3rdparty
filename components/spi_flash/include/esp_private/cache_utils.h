@@ -11,9 +11,18 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "esp_err.h"
+#ifdef __NuttX__
+#include <nuttx/semaphore.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifdef __NuttX__
+extern sem_t g_cpu_prepare_sem[CONFIG_SMP_NCPUS];
+extern volatile bool s_flash_op_can_start;
+extern volatile bool s_flash_op_complete;
 #endif
 
 /**

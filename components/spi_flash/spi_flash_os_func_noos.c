@@ -15,6 +15,33 @@
 #include "hal/cache_ll.h"
 #include "soc/soc_caps.h"
 
+#ifdef __NuttX__
+#  include <nuttx/init.h>
+#if defined(CONFIG_IDF_TARGET_ESP32)
+#  include "esp32_irq.h"
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+#  include "esp32s2_irq.h"
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#  include "esp32s3_irq.h"
+#else
+#  include "esp_irq.h"
+#endif
+
+#ifdef CONFIG_IDF_TARGET_ESP32
+#  define esp_intr_noniram_disable  esp32_irq_noniram_disable
+#  define esp_intr_noniram_enable   esp32_irq_noniram_enable
+#endif
+#ifdef CONFIG_IDF_TARGET_ESP32S2
+#  define esp_intr_noniram_disable() do {} while(0);
+#  define esp_intr_noniram_enable() do {} while(0);
+#endif
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+#  define esp_intr_noniram_disable  esp32s3_irq_noniram_disable
+#  define esp_intr_noniram_enable   esp32s3_irq_noniram_enable
+#endif
+
+#endif // __NuttX__
+
 static IRAM_ATTR esp_err_t start(void *arg)
 {
 #if SOC_BRANCH_PREDICTOR_SUPPORTED
@@ -22,6 +49,11 @@ static IRAM_ATTR esp_err_t start(void *arg)
     esp_cpu_branch_prediction_disable();
 #endif
 
+#ifdef __NuttX__
+    if (OSINIT_OS_READY()) {
+        esp_intr_noniram_disable();
+    }
+#endif
 #if CONFIG_IDF_TARGET_ESP32
     Cache_Read_Disable(0);
     Cache_Read_Disable(1);
@@ -44,7 +76,11 @@ static IRAM_ATTR esp_err_t end(void *arg)
 #if SOC_BRANCH_PREDICTOR_SUPPORTED
     esp_cpu_branch_prediction_enable();
 #endif
-
+#ifdef __NuttX__
+    if (OSINIT_OS_READY()) {
+        esp_intr_noniram_enable();
+    }
+#endif
     return ESP_OK;
 }
 

@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifdef __NuttX__
+#include <nuttx/kmalloc.h>
+#endif
+
 #include <stdint.h>
 #include <string.h>
 #include <sys/param.h>
@@ -14,7 +18,9 @@
 #include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_check.h"
+#ifndef __NuttX__
 #include "esp_heap_caps.h"
+#endif
 #include "esp_compiler.h"
 
 #include "soc/soc_caps.h"
@@ -460,9 +466,13 @@ esp_err_t esp_mmu_map(esp_paddr_t paddr_start, size_t size, mmu_target_t target,
     mem_block_t *new_block = NULL;
 
     if (TAILQ_EMPTY(&found_region->mem_block_head)) {
+#ifndef __NuttX__
         dummy_head = (mem_block_t *)heap_caps_calloc(1, sizeof(mem_block_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        ESP_GOTO_ON_FALSE(dummy_head, ESP_ERR_NO_MEM, err, TAG, "no mem");
+#else
+        dummy_head = (mem_block_t *)kmm_calloc(1, sizeof(mem_block_t));
+#endif // __NuttX__
 
+        ESP_GOTO_ON_FALSE(dummy_head, ESP_ERR_NO_MEM, err, TAG, "no mem");
         dummy_head->laddr_start = found_region->free_head;
         dummy_head->laddr_end = found_region->free_head;
         //We don't care vaddr or paddr address for dummy head
@@ -470,7 +480,11 @@ esp_err_t esp_mmu_map(esp_paddr_t paddr_start, size_t size, mmu_target_t target,
         dummy_head->caps = caps;
         TAILQ_INSERT_HEAD(&found_region->mem_block_head, dummy_head, entries);
 
+#ifndef __NuttX__
         dummy_tail = (mem_block_t *)heap_caps_calloc(1, sizeof(mem_block_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+#else
+        dummy_tail = (mem_block_t *)kmm_calloc(1, sizeof(mem_block_t));
+#endif // __NuttX__
         ESP_GOTO_ON_FALSE(dummy_tail, ESP_ERR_NO_MEM, err, TAG, "no mem");
 
         dummy_tail->laddr_start = found_region->end;
@@ -522,7 +536,11 @@ esp_err_t esp_mmu_map(esp_paddr_t paddr_start, size_t size, mmu_target_t target,
     }
 #endif //#if ENABLE_PADDR_CHECK
 
+#ifndef __NuttX__
     new_block = (mem_block_t *)heap_caps_calloc(1, sizeof(mem_block_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+#else
+    new_block = (mem_block_t *)kmm_calloc(1, sizeof(mem_block_t));
+#endif // __NuttX__
     ESP_GOTO_ON_FALSE(new_block, ESP_ERR_NO_MEM, err, TAG, "no mem");
 
     //Reserve this block as it'll be mapped

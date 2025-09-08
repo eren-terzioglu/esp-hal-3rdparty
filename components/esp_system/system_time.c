@@ -9,7 +9,9 @@
 
 #include "soc/rtc.h"
 
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
+#endif
 
 #include "sdkconfig.h"
 

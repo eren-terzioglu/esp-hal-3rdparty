@@ -12,10 +12,18 @@
 #include "soc/spi_periph.h"
 #include "soc/gpio_struct.h"
 #include "esp_private/periph_ctrl.h"
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifdef __NuttX__
+typedef uint32_t        TickType_t;
+typedef uint32_t        UBaseType_t;
+typedef int32_t         BaseType_t;
 #endif
 
 #if !SOC_RCC_IS_INDEPENDENT

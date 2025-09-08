@@ -17,10 +17,12 @@
 #include "esp_private/cache_utils.h"
 #include "spi_flash_mmap.h"
 #include "esp_flash_internal.h"
+#ifndef __NuttX__
 #if CONFIG_NEWLIB_ENABLED
 #include "esp_newlib.h"
 #endif
 #include "esp_newlib.h"
+#endif
 #include "esp_xt_wdt.h"
 #include "esp_cpu.h"
 #include "esp_private/startup_internal.h"
@@ -83,7 +85,9 @@ ESP_SYSTEM_INIT_FN(init_brownout, CORE, BIT(0), 104)
     // BOD and VBAT share the same interrupt number. To avoid blocking the system in an intermediate state
     // where an interrupt occurs and the interrupt number is enabled, but the ISR is not configured, enable
     // the interrupt after configuring both ISRs.
+#ifndef __NuttX__
     portDISABLE_INTERRUPTS();
+#endif
 #if CONFIG_ESP_BROWNOUT_DET
     esp_brownout_init();
 #else
@@ -95,16 +99,20 @@ ESP_SYSTEM_INIT_FN(init_brownout, CORE, BIT(0), 104)
 #if CONFIG_ESP_VBAT_INIT_AUTO
     ret = esp_vbat_init();
 #endif
+#ifndef __NuttX__
     portENABLE_INTERRUPTS();
+#endif
     return ret;
 }
 #endif
 
+#ifndef __NuttX__
 ESP_SYSTEM_INIT_FN(init_newlib_time, CORE, BIT(0), 105)
 {
     esp_libc_time_init();
     return ESP_OK;
 }
+#endif
 
 #if !CONFIG_APP_BUILD_TYPE_PURE_RAM_APP
 ESP_SYSTEM_INIT_FN(init_flash, CORE, BIT(0), 130)
@@ -145,6 +153,7 @@ ESP_SYSTEM_INIT_FN(init_pm, SECONDARY, BIT(0), 201)
 }
 #endif // CONFIG_PM_ENABLE
 
+#ifndef __NuttX__
 #if SOC_APB_BACKUP_DMA
 ESP_SYSTEM_INIT_FN(init_apb_dma, SECONDARY, BIT(0), 203)
 {
@@ -153,12 +162,18 @@ ESP_SYSTEM_INIT_FN(init_apb_dma, SECONDARY, BIT(0), 203)
     return ESP_OK;
 }
 #endif
+#endif
 
 #if CONFIG_SW_COEXIST_ENABLE || CONFIG_EXTERNAL_COEX_ENABLE
 ESP_SYSTEM_INIT_FN(init_coexist, SECONDARY, BIT(0), 204)
 {
+#ifndef __NuttX__
+    // At this point Nuttx does not have a full initialization.
+    // i.e. heap allocation is not available so this would crash.
+    // Instead, we call those functions on board bringup.
     esp_coex_adapter_register(&g_coex_adapter_funcs);
     coex_pre_init();
+#endif
     return ESP_OK;
 }
 #endif // CONFIG_SW_COEXIST_ENABLE || CONFIG_EXTERNAL_COEX_ENABLE
