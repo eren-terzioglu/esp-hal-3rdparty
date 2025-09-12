@@ -20,6 +20,9 @@
 #include "esp_attr.h"
 #include "esp_assert.h"
 #include "hal/misc.h"
+#ifdef __NuttX__
+#include "soc/i2c_reg.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {

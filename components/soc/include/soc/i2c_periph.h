@@ -5,7 +5,9 @@
  */
 #pragma once
 
+#if !(defined(__NuttX__) && defined(CONFIG_ARCH_CHIP_ESP32S3))
 #include "soc/i2c_reg.h"
+#endif
 #include "soc/i2c_struct.h"
 #include "soc/soc_caps.h"
 #if SOC_I2C_SUPPORTED
