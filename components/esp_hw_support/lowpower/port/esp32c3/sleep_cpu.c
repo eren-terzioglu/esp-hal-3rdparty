@@ -14,8 +14,10 @@
 #include "esp_check.h"
 #include "esp_sleep.h"
 #include "esp_log.h"
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#endif
 #include "esp_heap_caps.h"
 #include "hal/rtc_hal.h"
 #include "soc/rtc_periph.h"

@@ -6,7 +6,11 @@
 
 #include <stddef.h>
 #include <string.h>
+#ifndef __NuttX__
 #include <sys/lock.h>
+#else
+#include <nuttx/spinlock.h>
+#endif
 #include <sys/param.h>
 
 #include "esp_err.h"
@@ -194,7 +198,11 @@ typedef struct {
 #endif
         void *entries_tail;
     } lists[SLEEP_RETENTION_REGDMA_LINK_NR_PRIORITIES];
+#ifndef __NuttX__
     _lock_t lock;
+#else
+    rmutex_t lock;
+#endif
     regdma_link_priority_t highpri;
     sleep_retention_module_bitmap_t inited_modules;
     sleep_retention_module_bitmap_t created_modules;
@@ -205,10 +213,18 @@ typedef struct {
 } sleep_retention_t;
 
 static DRAM_ATTR __attribute__((unused)) sleep_retention_t s_retention = {
+#ifdef __NuttX__
+    .lock = NXRMUTEX_INITIALIZER,
+#endif
     .highpri = (uint8_t)-1,
     .inited_modules = (sleep_retention_module_bitmap_t){ .bitmap = { 0 } },
     .created_modules = (sleep_retention_module_bitmap_t){ .bitmap = { 0 } }
 };
+
+#ifdef __NuttX__
+#define _lock_acquire_recursive  nxrmutex_lock
+#define _lock_release_recursive  nxrmutex_unlock
+#endif
 
 #define SLEEP_RETENTION_ENTRY_BITMAP_MASK       (BIT(REGDMA_LINK_ENTRY_NUM) - 1)
 #define SLEEP_RETENTION_ENTRY_BITMAP(bitmap)    ((bitmap) & SLEEP_RETENTION_ENTRY_BITMAP_MASK)
@@ -739,6 +755,7 @@ esp_err_t sleep_retention_module_init(sleep_retention_module_t module, sleep_ret
     if (param == NULL || param->cbs.create.handle == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
+#ifndef __NuttX__
     if (s_retention.lock == NULL) {
         /* Passive modules will be initialized during the system startup, with the
          * operating system scheduler not yet enabled. There is no risk of contention
@@ -750,6 +767,7 @@ esp_err_t sleep_retention_module_init(sleep_retention_module_t module, sleep_ret
         }
     }
 
+#endif
     esp_err_t err = ESP_OK;
     _lock_acquire_recursive(&s_retention.lock);
     if (module_is_created(module) || module_is_inited(module)) {
@@ -789,8 +807,10 @@ esp_err_t sleep_retention_module_deinit(sleep_retention_module_t module)
     _lock_release_recursive(&s_retention.lock);
 
     if (do_lock_release) {
+#ifndef __NuttX__
         _lock_close_recursive(&s_retention.lock);
         s_retention.lock = NULL;
+#endif
     }
     return err;
 }

@@ -866,7 +866,9 @@ static esp_err_t FORCE_IRAM_ATTR esp_sleep_start_safe(uint32_t sleep_flags, uint
 
 #if ESP_ROM_SUPPORT_DEEP_SLEEP_WAKEUP_STUB && SOC_DEEP_SLEEP_SUPPORTED
 #if SOC_PM_SUPPORT_DEEPSLEEP_CHECK_STUB_ONLY
+#ifndef __NuttX__
         esp_set_deep_sleep_wake_stub_default_entry();
+#endif
 #elif !CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP && SOC_RTC_FAST_MEM_SUPPORTED
         /* If not possible stack is in RTC FAST memory, use the ROM function to calculate the CRC and save ~140 bytes IRAM */
         set_rtc_memory_crc();
