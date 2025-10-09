@@ -17,6 +17,8 @@
 #include "esp_private/esp_sleep_internal.h"
 #include "esp_log.h"
 
+#define uart_dev_t hal_uart_dev_t
+
 const __attribute__((unused)) static char *TAG = "uart_wakeup";
 
 #if SOC_UART_WAKEUP_SUPPORT_CHAR_SEQ_MODE

@@ -14,7 +14,9 @@
 #include "esp_sleep.h"
 #include "esp_log.h"
 #include "esp_check.h"
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
+#endif
 
 static __attribute__((unused)) const char *TAG = "sleep_event";
 

@@ -19,7 +19,12 @@
 #include "pmu_param.h"
 #include "hal/efuse_ll.h"
 #include "hal/efuse_hal.h"
+#ifndef __NuttX__
 #include "esp_hw_log.h"
+#else
+#include "esp_log.h"
+#define ESP_HW_LOGD ESP_LOGD
+#endif
 
 static __attribute__((unused)) const char *TAG = "pmu_sleep";
 

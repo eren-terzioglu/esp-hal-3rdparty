@@ -7,7 +7,9 @@
 #pragma once
 
 #include "sdkconfig.h"
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
+#endif
 #include "esp_err.h"
 
 #ifdef __cplusplus

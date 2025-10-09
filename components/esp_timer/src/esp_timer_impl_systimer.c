@@ -18,7 +18,11 @@
 #include "esp_private/esp_clk.h"
 #include "esp_private/systimer.h"
 #include "esp_private/periph_ctrl.h"
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
+#else
+#include "spinlock.h"
+#endif
 #include "hal/systimer_ll.h"
 #include "hal/systimer_types.h"
 #include "hal/systimer_hal.h"
@@ -55,7 +59,25 @@ static intr_handler_t s_alarm_handler = NULL;
 static systimer_hal_context_t systimer_hal;
 
 /* Spinlock used to protect access to the hardware registers. */
+#ifndef __NuttX__
 extern portMUX_TYPE s_time_update_lock;
+#else
+#define CONFIG_ESP_TIMER_INTERRUPT_LEVEL 1
+#define portNUM_PROCESSORS CONFIG_SOC_CPU_CORES_NUM
+#define xPortGetCoreID() this_cpu()
+#define portENTER_CRITICAL_SAFE(lock) do { \
+            assert(g_flags == UINT32_MAX); \
+            g_flags = spin_lock_irqsave(lock); \
+        } while(0)
+#define portEXIT_CRITICAL_SAFE(lock) do { \
+            spin_unlock_irqrestore((lock), g_flags); \
+            g_flags = UINT32_MAX; \
+        } while(0)
+static irqstate_t g_flags = UINT32_MAX;
+
+extern spinlock_t s_time_update_lock;
+#endif
+
 
 /* Alarm values to generate interrupt on match */
 extern uint64_t timestamp_id[2];

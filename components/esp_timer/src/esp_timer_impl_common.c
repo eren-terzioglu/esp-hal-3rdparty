@@ -9,9 +9,26 @@
 #include "esp_err.h"
 #include "esp_task.h"
 #include "esp_attr.h"
+#ifdef __NuttX__
+#include "spinlock.h"
+#endif
 
 /* Spinlock used to protect access to the hardware registers. */
+#ifndef __NuttX__
 portMUX_TYPE s_time_update_lock = portMUX_INITIALIZER_UNLOCKED;
+#else
+#define portENTER_CRITICAL(lock) do { \
+            assert(g_flags == UINT32_MAX); \
+            g_flags = spin_lock_irqsave(lock); \
+        } while(0)
+#define portEXIT_CRITICAL(lock) do { \
+            spin_unlock_irqrestore((lock), g_flags); \
+            g_flags = UINT32_MAX; \
+        } while(0)
+static irqstate_t g_flags = UINT32_MAX;
+
+extern spinlock_t s_time_update_lock;
+#endif
 
 /* Alarm values to generate interrupt on match
  * [0] - for ESP_TIMER_TASK alarms,

@@ -16,8 +16,10 @@
 #include "esp_sleep.h"
 #include "esp_log.h"
 #include "esp_rom_crc.h"
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#endif
 #include "esp_heap_caps.h"
 #include "riscv/csr.h"
 #include "soc/soc_caps.h"
