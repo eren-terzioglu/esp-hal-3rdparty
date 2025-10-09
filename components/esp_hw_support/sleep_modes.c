@@ -45,6 +45,9 @@
 
 #ifdef __NuttX__
 #include "esp_time_impl.h"
+#include "espressif/esp_hr_timer.h"
+#include "hal/cache_hal.h"
+#define esp_timer_get_time esp_hr_timer_time_us
 #endif
 
 #if SOC_SLEEP_SYSTIMER_STALL_WORKAROUND
@@ -554,7 +557,11 @@ static void FORCE_IRAM_ATTR suspend_cache(void) {
         // fully check the access to external memory, writeback & invalidate is needed here.
         Cache_WriteBack_Invalidate_All(CACHE_MAP_MASK);
 #endif
+#ifndef __NuttX__
         spi_flash_disable_cache(esp_cpu_get_core_id(), NULL);
+#else
+        cache_hal_suspend(CACHE_LL_LEVEL_EXT_MEM, CACHE_TYPE_ALL);
+#endif
     }
 }
 
@@ -563,7 +570,11 @@ static void FORCE_IRAM_ATTR resume_cache(void) {
     s_cache_suspend_cnt--;
     assert(s_cache_suspend_cnt >= 0 && DRAM_STR("cache resume doesn't match suspend ops"));
     if (s_cache_suspend_cnt == 0) {
+#ifndef __NuttX__
         spi_flash_restore_cache(esp_cpu_get_core_id(), 0);
+#else
+        cache_hal_resume(CACHE_LL_LEVEL_EXT_MEM, CACHE_TYPE_ALL);
+#endif
     }
 }
 
@@ -2104,7 +2115,6 @@ uint64_t esp_sleep_get_ext1_wakeup_status(void)
 }
 
 #endif // SOC_PM_SUPPORT_EXT1_WAKEUP && SOC_RTCIO_PIN_COUNT > 0
-
 #if SOC_GPIO_SUPPORT_DEEPSLEEP_WAKEUP && SOC_DEEP_SLEEP_SUPPORTED
 uint64_t esp_sleep_get_gpio_wakeup_status(void)
 {

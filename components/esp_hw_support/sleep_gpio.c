@@ -26,7 +26,11 @@
 
 #include "hal/rtc_hal.h"
 
+#ifndef __NuttX__
 #include "esp_private/gpio.h"
+#else
+#include "driver/gpio.h"
+#endif
 #include "esp_private/sleep_gpio.h"
 #include "esp_private/spi_flash_os.h"
 #include "esp_private/startup_internal.h"
