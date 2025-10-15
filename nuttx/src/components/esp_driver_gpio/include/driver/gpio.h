@@ -37,6 +37,97 @@ extern "C" {
 
 esp_err_t gpio_hold_en(gpio_num_t gpio_num);
 
+/**
+  * @brief Enable pull-up on GPIO.
+  *
+  * @param gpio_num GPIO number
+  *
+  * @return
+  *     - ESP_OK Success
+  *     - ESP_ERR_INVALID_ARG Parameter error
+  */
+esp_err_t gpio_pullup_en(gpio_num_t gpio_num);
+
+/**
+  * @brief Disable pull-up on GPIO.
+  *
+  * @param gpio_num GPIO number
+  *
+  * @return
+  *     - ESP_OK Success
+  *     - ESP_ERR_INVALID_ARG Parameter error
+  */
+esp_err_t gpio_pullup_dis(gpio_num_t gpio_num);
+
+/**
+  * @brief Enable pull-down on GPIO.
+  *
+  * @param gpio_num GPIO number
+  *
+  * @return
+  *     - ESP_OK Success
+  *     - ESP_ERR_INVALID_ARG Parameter error
+  */
+esp_err_t gpio_pulldown_en(gpio_num_t gpio_num);
+
+/**
+  * @brief Disable pull-down on GPIO.
+  *
+  * @param gpio_num GPIO number
+  *
+  * @return
+  *     - ESP_OK Success
+  *     - ESP_ERR_INVALID_ARG Parameter error
+  */
+esp_err_t gpio_pulldown_dis(gpio_num_t gpio_num);
+
+/**
+  * @brief Enable SLP_SEL to change GPIO status automantically in lightsleep.
+  * @param gpio_num GPIO number of the pad.
+  *
+  * @return
+  *     - ESP_OK Success
+  *
+  */
+esp_err_t gpio_sleep_sel_en(gpio_num_t gpio_num);
+
+/**
+  * @brief Disable SLP_SEL to change GPIO status automantically in lightsleep.
+  * @param gpio_num GPIO number of the pad.
+  *
+  * @return
+  *     - ESP_OK Success
+  */
+esp_err_t gpio_sleep_sel_dis(gpio_num_t gpio_num);
+
+/**
+ * @brief    GPIO set direction at sleep
+ *
+ * Configure GPIO direction,such as output_only,input_only,output_and_input
+ *
+ * @param  gpio_num  Configure GPIO pins number, it should be GPIO number. If you want to set direction of e.g. GPIO16, gpio_num should be GPIO_NUM_16 (16);
+ * @param  mode GPIO direction
+ *
+ * @return
+ *     - ESP_OK Success
+ *     - ESP_ERR_INVALID_ARG GPIO error
+ */
+esp_err_t gpio_sleep_set_direction(gpio_num_t gpio_num, gpio_mode_t mode);
+
+/**
+ * @brief  Configure GPIO pull-up/pull-down resistors at sleep
+ *
+ * @note ESP32: Only pins that support both input & output have integrated pull-up and pull-down resistors. Input-only GPIOs 34-39 do not.
+ *
+ * @param  gpio_num GPIO number. If you want to set pull up or down mode for e.g. GPIO16, gpio_num should be GPIO_NUM_16 (16);
+ * @param  pull GPIO pull up/down mode.
+ *
+ * @return
+ *     - ESP_OK Success
+ *     - ESP_ERR_INVALID_ARG : Parameter error
+ */
+esp_err_t gpio_sleep_set_pull_mode(gpio_num_t gpio_num, gpio_pull_mode_t pull);
+
 #if SOC_GPIO_SUPPORT_DEEPSLEEP_WAKEUP
 
 /**
@@ -91,146 +182,6 @@ esp_err_t gpio_iomux_input(gpio_num_t gpio_num, int func, uint32_t signal_idx);
   *     - ESP_ERR_INVALID_ARG GPIO number error
   */
 esp_err_t gpio_iomux_output(gpio_num_t gpio_num, int func);
-
-/**
-  * @brief Enable SLP_SEL to change GPIO status automantically in lightsleep.
-  * @param gpio_num GPIO number of the pad.
-  *
-  * @return
-  *     - ESP_OK Success
-  *
-  */
-esp_err_t gpio_sleep_sel_en(gpio_num_t gpio_num);
-
-/**
-  * @brief Disable SLP_SEL to change GPIO status automantically in lightsleep.
-  * @param gpio_num GPIO number of the pad.
-  *
-  * @return
-  *     - ESP_OK Success
-  */
-esp_err_t gpio_sleep_sel_dis(gpio_num_t gpio_num);
-
-/**
- * @brief    GPIO set direction at sleep
- *
- * Configure GPIO direction,such as output_only,input_only,output_and_input
- *
- * @param  gpio_num  Configure GPIO pins number, it should be GPIO number. If you want to set direction of e.g. GPIO16, gpio_num should be GPIO_NUM_16 (16);
- * @param  mode GPIO direction
- *
- * @return
- *     - ESP_OK Success
- *     - ESP_ERR_INVALID_ARG GPIO error
- */
-esp_err_t gpio_sleep_set_direction(gpio_num_t gpio_num, gpio_mode_t mode);
-
-/**
- * @brief  Configure GPIO pull-up/pull-down resistors at sleep
- *
- * @note ESP32: Only pins that support both input & output have integrated pull-up and pull-down resistors. Input-only GPIOs 34-39 do not.
- *
- * @param  gpio_num GPIO number. If you want to set pull up or down mode for e.g. GPIO16, gpio_num should be GPIO_NUM_16 (16);
- * @param  pull GPIO pull up/down mode.
- *
- * @return
- *     - ESP_OK Success
- *     - ESP_ERR_INVALID_ARG : Parameter error
- */
-esp_err_t gpio_sleep_set_pull_mode(gpio_num_t gpio_num, gpio_pull_mode_t pull);
-
-
-/**
-  * @brief Enable SLP_SEL to change GPIO status automantically in lightsleep.
-  * @param gpio_num GPIO number of the pad.
-  *
-  * @return
-  *     - ESP_OK Success
-  *
-  */
-esp_err_t gpio_sleep_sel_en(gpio_num_t gpio_num);
-
-/**
-  * @brief Disable SLP_SEL to change GPIO status automantically in lightsleep.
-  * @param gpio_num GPIO number of the pad.
-  *
-  * @return
-  *     - ESP_OK Success
-  */
-esp_err_t gpio_sleep_sel_dis(gpio_num_t gpio_num);
-
-/**
- * @brief    GPIO set direction at sleep
- *
- * Configure GPIO direction,such as output_only,input_only,output_and_input
- *
- * @param  gpio_num  Configure GPIO pins number, it should be GPIO number. If you want to set direction of e.g. GPIO16, gpio_num should be GPIO_NUM_16 (16);
- * @param  mode GPIO direction
- *
- * @return
- *     - ESP_OK Success
- *     - ESP_ERR_INVALID_ARG GPIO error
- */
-esp_err_t gpio_sleep_set_direction(gpio_num_t gpio_num, gpio_mode_t mode);
-
-/**
- * @brief  Configure GPIO pull-up/pull-down resistors at sleep
- *
- * @note ESP32: Only pins that support both input & output have integrated pull-up and pull-down resistors. Input-only GPIOs 34-39 do not.
- *
- * @param  gpio_num GPIO number. If you want to set pull up or down mode for e.g. GPIO16, gpio_num should be GPIO_NUM_16 (16);
- * @param  pull GPIO pull up/down mode.
- *
- * @return
- *     - ESP_OK Success
- *     - ESP_ERR_INVALID_ARG : Parameter error
- */
-esp_err_t gpio_sleep_set_pull_mode(gpio_num_t gpio_num, gpio_pull_mode_t pull);
-
-
-/**
-  * @brief Enable pull-up on GPIO.
-  *
-  * @param gpio_num GPIO number
-  *
-  * @return
-  *     - ESP_OK Success
-  *     - ESP_ERR_INVALID_ARG Parameter error
-  */
-esp_err_t gpio_pullup_en(gpio_num_t gpio_num);
-
-/**
-  * @brief Disable pull-up on GPIO.
-  *
-  * @param gpio_num GPIO number
-  *
-  * @return
-  *     - ESP_OK Success
-  *     - ESP_ERR_INVALID_ARG Parameter error
-  */
-esp_err_t gpio_pullup_dis(gpio_num_t gpio_num);
-
-/**
-  * @brief Enable pull-down on GPIO.
-  *
-  * @param gpio_num GPIO number
-  *
-  * @return
-  *     - ESP_OK Success
-  *     - ESP_ERR_INVALID_ARG Parameter error
-  */
-esp_err_t gpio_pulldown_en(gpio_num_t gpio_num);
-
-/**
-  * @brief Disable pull-down on GPIO.
-  *
-  * @param gpio_num GPIO number
-  *
-  * @return
-  *     - ESP_OK Success
-  *     - ESP_ERR_INVALID_ARG Parameter error
-  */
-esp_err_t gpio_pulldown_dis(gpio_num_t gpio_num);
 
 #ifdef __cplusplus
 }
