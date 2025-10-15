@@ -557,11 +557,7 @@ static void FORCE_IRAM_ATTR suspend_cache(void) {
         // fully check the access to external memory, writeback & invalidate is needed here.
         Cache_WriteBack_Invalidate_All(CACHE_MAP_MASK);
 #endif
-#ifndef __NuttX__
         spi_flash_disable_cache(esp_cpu_get_core_id(), NULL);
-#else
-        cache_hal_suspend(CACHE_LL_LEVEL_EXT_MEM, CACHE_TYPE_ALL);
-#endif
     }
 }
 
@@ -570,11 +566,7 @@ static void FORCE_IRAM_ATTR resume_cache(void) {
     s_cache_suspend_cnt--;
     assert(s_cache_suspend_cnt >= 0 && DRAM_STR("cache resume doesn't match suspend ops"));
     if (s_cache_suspend_cnt == 0) {
-#ifndef __NuttX__
         spi_flash_restore_cache(esp_cpu_get_core_id(), 0);
-#else
-        cache_hal_resume(CACHE_LL_LEVEL_EXT_MEM, CACHE_TYPE_ALL);
-#endif
     }
 }
 
