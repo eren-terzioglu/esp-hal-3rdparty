@@ -13,7 +13,9 @@
 #include "hal/vbat_ll.h"
 #include "hal/brownout_ll.h"
 #include "hal/vbat_hal.h"
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
+#endif
 #include "sdkconfig.h"
 #include "esp_private/esp_sleep_internal.h"
 #include "esp_private/startup_internal.h"
