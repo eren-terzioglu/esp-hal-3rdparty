@@ -28,6 +28,9 @@
 #ifndef __NuttX__
 #include "esp_newlib.h"
 #endif
+#if defined(__NuttX__) && defined(CONFIG_IDF_TARGET_ESP32S2)
+#include "platform_include/esp_newlib.h"
+#endif
 #include "esp_timer.h"
 #include "esp_ipc_isr.h"
 #ifndef __NuttX__

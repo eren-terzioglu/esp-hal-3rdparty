@@ -15,8 +15,12 @@
 #include "esp_ipc_isr.h"
 #include "esp_sleep.h"
 #include "esp_log.h"
+#ifndef __NuttX__
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#else
+#include "xtensa_context.h"
+#endif
 #include "esp_heap_caps.h"
 #include "soc/rtc_periph.h"
 #include "soc/soc_caps.h"

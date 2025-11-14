@@ -119,7 +119,9 @@ int IRAM_ATTR esp_clk_xtal_freq(void)
 #if !NON_OS_BUILD
 uint64_t esp_rtc_get_time_us(void)
 {
+#if !(defined(__NuttX__) && defined(CONFIG_IDF_TARGET_ESP32S2))
     ENTER_CRITICAL_SECTION(&s_esp_rtc_time_lock);
+#endif
     const uint32_t cal = esp_clk_slowclk_cal_get();
 #if SOC_RTC_MEM_SUPPORTED
     static bool first_call = true;
@@ -162,11 +164,15 @@ uint64_t esp_rtc_get_time_us(void)
     s_rtc_timer_retain_mem.rtc_last_ticks = rtc_this_ticks;
     s_rtc_timer_retain_mem.checksum = calc_checksum();
     uint64_t esp_rtc_time_us = s_rtc_timer_retain_mem.rtc_time_us;
+#if !(defined(__NuttX__) && defined(CONFIG_IDF_TARGET_ESP32S2))
     LEAVE_CRITICAL_SECTION(&s_esp_rtc_time_lock);
+#endif
     return esp_rtc_time_us;
 #else
     uint64_t esp_rtc_time_us = delta_time_us + clk_ll_rtc_slow_load_rtc_fix_us();
+#if !(defined(__NuttX__) && defined(CONFIG_IDF_TARGET_ESP32S2))
     LEAVE_CRITICAL_SECTION(&s_esp_rtc_time_lock);
+#endif
     return esp_rtc_time_us;
 #endif
 }
