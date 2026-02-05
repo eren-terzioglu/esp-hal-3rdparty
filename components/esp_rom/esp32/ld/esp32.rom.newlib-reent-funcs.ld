@@ -36,10 +36,12 @@ atoi = 0x400566c4;
 _atoi_r = 0x400566d4;
 atol = 0x400566ec;
 _atol_r = 0x400566fc;
+#ifndef  __NuttX__
 strdup = 0x4000143c;
 _strdup_r = 0x40001450;
 strndup = 0x400016b0;
 _strndup_r = 0x400016c4;
+#endif
 __strtok_r = 0x4000c6a8;
 strtok_r = 0x4000c70c;
 strtol = 0x4005681c;

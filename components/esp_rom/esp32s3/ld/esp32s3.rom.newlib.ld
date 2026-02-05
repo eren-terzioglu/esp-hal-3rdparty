@@ -15,9 +15,9 @@
  * multiple files to make it compatible with picolibc.
  */
 
+#ifndef __NuttX__
 strdup = 0x40001380;
 strndup = 0x400013ec;
-#ifndef __NuttX__
 rand = 0x400014a0;
 srand = 0x400014ac;
 #endif
