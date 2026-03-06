@@ -17,6 +17,8 @@
 #include "sdkconfig.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <semaphore.h>
 #include <nuttx/clock.h>
 #include <nuttx/sched.h>
 #include <nuttx/init.h>
@@ -152,6 +154,40 @@ typedef uint32_t esp_os_tick_type_t;
 typedef intr_handler_t esp_os_intr_handler_t;
 typedef rmutex_t esp_os_recursive_mutex_t;
 
+/* Task management types */
+
+typedef pid_t esp_os_task_handle_t;
+typedef void (*esp_os_task_function_t)(void *);
+
+/* Task notification structure (wraps semaphore) */
+
+struct esp_os_task_notify_s
+{
+  sem_t sem;
+  esp_os_task_handle_t task;
+};
+
+typedef struct esp_os_task_notify_s esp_os_task_notify_t;
+
+/* FreeRTOS compatibility defines */
+
+#define pdTRUE  1
+#define pdFALSE 0
+#define pdPASS  0
+#define portMAX_DELAY 0xfffffffful
+
+#ifdef CONFIG_SMP
+#  define portNUM_PROCESSORS CONFIG_SMP_NCPUS
+#else
+#  define portNUM_PROCESSORS 1
+#endif
+
+/* Spinlock initialization for static array initialization */
+#define portMUX_INITIALIZER_UNLOCKED {}
+
+/* Tick type for timeout calculations */
+typedef uint32_t TickType_t;
+
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
@@ -216,6 +252,29 @@ void esp_os_scheduler_disable(void);
 void esp_os_scheduler_enable(void);
 
 bool esp_os_scheduler_started(void);
+
+/* Task management functions */
+
+int esp_os_create_task_pinned_to_core(esp_os_task_function_t task_func,
+                                       FAR const char *name,
+                                       uint32_t stack_depth,
+                                       FAR void *arg,
+                                       int priority,
+                                       FAR esp_os_task_handle_t *handle,
+                                       int core_id);
+
+void esp_os_task_delete(esp_os_task_handle_t handle);
+
+uint32_t esp_os_task_notify_take(bool clear_on_exit, uint32_t wait_ticks);
+
+int esp_os_task_notify_give_from_isr(esp_os_task_handle_t task,
+                                      FAR int *higher_priority_woken);
+
+esp_os_task_handle_t esp_os_task_get_current_handle(void);
+
+void esp_os_task_delay_ms(uint32_t ms);
+
+uint32_t esp_os_task_get_tick_count(void);
 
 #ifdef __cplusplus
 }

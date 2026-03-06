@@ -13,6 +13,7 @@
 
 #include <debug.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <clock/clock.h>
 
 #include <nuttx/mutex.h>
@@ -21,6 +22,11 @@
 #include <nuttx/queue.h>
 #include <nuttx/mqueue.h>
 #include <nuttx/kmalloc.h>
+#include <semaphore.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <nuttx/kthread.h>
+#include <nuttx/sched.h>
 
 #include "sdkconfig.h"
 
@@ -809,4 +815,153 @@ void nuttx_exit_critical(void)
     {
       up_irq_restore(g_int_flags[cpu]);
     }
+}
+
+/****************************************************************************
+ * Task Management Implementation
+ ****************************************************************************/
+
+static sem_t g_esp_timer_task_sem;
+static esp_os_task_handle_t g_esp_timer_task_handle = -1;
+
+/* Wrapper to adapt FreeRTOS-style void(*)(void*) to NuttX int(*)(int, char**) */
+
+struct task_wrapper_args_s
+{
+  void (*func)(void *);
+  void *arg;
+};
+
+static int task_wrapper_entry(int argc, FAR char *argv[])
+{
+  struct task_wrapper_args_s *wrapper_args = (struct task_wrapper_args_s *)argv[1];
+
+  wrapper_args->func(wrapper_args->arg);
+
+  free(wrapper_args);
+  return 0;
+}
+
+int esp_os_create_task_pinned_to_core(esp_os_task_function_t task_func,
+                                      const char *name,
+                                      uint32_t stack_size,
+                                      void *arg,
+                                      int priority,
+                                      esp_os_task_handle_t *task_handle,
+                                      int core_id)
+{
+  pid_t pid;
+  struct task_wrapper_args_s *wrapper_args;
+  char arg_str[32];
+  char *argv[2];
+
+  /* Allocate wrapper args */
+
+  wrapper_args = malloc(sizeof(struct task_wrapper_args_s));
+  if (wrapper_args == NULL)
+    {
+      return -1;
+    }
+
+  wrapper_args->func = (void (*)(void*))task_func;
+  wrapper_args->arg = arg;
+
+  /* Create args for kthread_create */
+
+  argv[0] = (void *)wrapper_args;
+  argv[1] = NULL;
+
+  pid = kthread_create(name, priority, stack_size,
+                       task_wrapper_entry, argv);
+  if (pid < 0)
+    {
+      free(wrapper_args);
+      return -1;
+    }
+
+#ifdef CONFIG_SMP
+  if (core_id >= 0)
+    {
+      cpu_set_t cpuset;
+      CPU_ZERO(&cpuset);
+      CPU_SET(core_id, &cpuset);
+      sched_setaffinity(pid, sizeof(cpu_set_t), &cpuset);
+    }
+#endif
+
+  if (task_handle == &g_esp_timer_task_handle)
+    {
+      nxsem_init(&g_esp_timer_task_sem, 0, 0);
+    }
+
+  if (task_handle != NULL)
+    {
+      *task_handle = pid;
+    }
+
+  return 0;
+}
+
+void esp_os_task_delete(esp_os_task_handle_t handle)
+{
+  if (handle > 0)
+    {
+      kthread_delete(handle);
+    }
+}
+
+uint32_t esp_os_task_notify_take(bool clear_on_exit, uint32_t wait_ticks)
+{
+  int ret;
+
+  if (wait_ticks == 0xfffffffful)
+    {
+      ret = nxsem_wait(&g_esp_timer_task_sem);
+    }
+  else
+    {
+      struct timespec abstime;
+      clock_gettime(CLOCK_REALTIME, &abstime);
+      abstime.tv_nsec += (wait_ticks * NSEC_PER_MSEC * 10);
+
+      while (abstime.tv_nsec >= NSEC_PER_SEC)
+        {
+          abstime.tv_sec++;
+          abstime.tv_nsec -= NSEC_PER_SEC;
+        }
+
+      ret = nxsem_timedwait(&g_esp_timer_task_sem, &abstime);
+    }
+
+  return (ret == OK) ? 1 : 0;
+}
+
+int esp_os_task_notify_give_from_isr(esp_os_task_handle_t task,
+                                      FAR int *higher_priority_woken)
+{
+  int ret = nxsem_post(&g_esp_timer_task_sem);
+
+  if (higher_priority_woken != NULL)
+    {
+      *higher_priority_woken = 0;
+    }
+
+  return ret;
+}
+
+esp_os_task_handle_t esp_os_task_get_current_handle(void)
+{
+  return getpid();
+}
+
+void esp_os_task_delay_ms(uint32_t ms)
+{
+  usleep(ms * 1000);
+}
+
+uint32_t esp_os_task_get_tick_count(void)
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  return (uint32_t)((ts.tv_sec * 1000) + (ts.tv_nsec / 1000000));
 }
