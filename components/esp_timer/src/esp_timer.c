@@ -94,7 +94,7 @@ static OS_SPINLOCK_TYPE s_timer_lock[ESP_TIMER_MAX] = {
 
 #ifdef CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD
 // For ISR dispatch method, a callback function of the timer may require a context switch
-static volatile int s_isr_dispatch_need_yield = 0;
+static volatile int s_isr_dispatch_need_yield = OS_FALSE;
 #endif // CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD
 
 esp_err_t esp_timer_create(const esp_timer_create_args_t* args,
@@ -464,12 +464,12 @@ static ESP_TIMER_IRAM_ATTR bool timer_armed(esp_timer_handle_t timer)
 
 static ESP_TIMER_IRAM_ATTR void timer_list_lock(esp_timer_dispatch_t timer_type)
 {
-    OS_ENTER_CRITICAL_WITH_LOCK_SAFE(&s_timer_lock[timer_type]);
+    esp_os_enter_critical_safe(&s_timer_lock[timer_type]);
 }
 
 static ESP_TIMER_IRAM_ATTR void timer_list_unlock(esp_timer_dispatch_t timer_type)
 {
-    OS_EXIT_CRITICAL_WITH_LOCK_SAFE(&s_timer_lock[timer_type]);
+    esp_os_exit_critical_safe(&s_timer_lock[timer_type]);
 }
 
 #ifdef CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD
@@ -547,7 +547,7 @@ static bool timer_process_alarm(esp_timer_dispatch_t dispatch_method)
 static void timer_task(void* arg)
 {
     while (true) {
-        esp_os_task_notify_take(true, OS_PORT_MAX_DELAY);
+        esp_os_task_notify_take(OS_TRUE, OS_PORT_MAX_DELAY);
         // all deferred events are processed at a time
         timer_process_alarm(ESP_TIMER_TASK);
     }
@@ -557,7 +557,7 @@ static void timer_task(void* arg)
 ESP_TIMER_IRAM_ATTR void esp_timer_isr_dispatch_need_yield(void)
 {
     assert(OS_IN_ISR());
-    s_isr_dispatch_need_yield = 1;
+    s_isr_dispatch_need_yield = OS_TRUE;
 }
 #endif
 

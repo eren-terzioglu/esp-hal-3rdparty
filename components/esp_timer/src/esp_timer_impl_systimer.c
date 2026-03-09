@@ -96,7 +96,7 @@ static void ESP_TIMER_IRAM_ATTR timer_alarm_isr(void *arg)
     static volatile uint32_t processed_by = NOT_USED;
     static volatile bool pending_alarm = false;
     /* CRITICAL section ensures the read/clear is atomic between cores */
-    OS_ENTER_CRITICAL_WITH_LOCK_ISR(&s_time_update_lock);
+    esp_os_enter_critical_isr(&s_time_update_lock);
     if (systimer_ll_is_alarm_int_fired(systimer_hal.dev, SYSTIMER_ALARM_ESPTIMER)) {
         // Clear interrupt status
         systimer_ll_clear_alarm_int(systimer_hal.dev, SYSTIMER_ALARM_ESPTIMER);
@@ -108,11 +108,11 @@ static void ESP_TIMER_IRAM_ATTR timer_alarm_isr(void *arg)
                 pending_alarm = false;
                 // Clear interrupt status
                 systimer_ll_clear_alarm_int(systimer_hal.dev, SYSTIMER_ALARM_ESPTIMER);
-                OS_EXIT_CRITICAL_WITH_LOCK_ISR(&s_time_update_lock);
+                esp_os_exit_critical_isr(&s_time_update_lock);
 
                 (*s_alarm_handler)(arg);
 
-                OS_ENTER_CRITICAL_WITH_LOCK_ISR(&s_time_update_lock);
+                esp_os_enter_critical_isr(&s_time_update_lock);
                 // Another alarm could have occurred while were handling the previous alarm.
                 // Check if we need to call the s_alarm_handler again:
                 //   1) if the alarm has already been fired, it helps to handle it immediately without an additional ISR call.
@@ -126,7 +126,7 @@ static void ESP_TIMER_IRAM_ATTR timer_alarm_isr(void *arg)
             pending_alarm = true;
         }
     }
-    OS_EXIT_CRITICAL_WITH_LOCK_ISR(&s_time_update_lock);
+    esp_os_exit_critical_isr(&s_time_update_lock);
 #endif // ISR_HANDLERS != 1
 }
 

@@ -169,10 +169,6 @@ struct esp_os_task_notify_s
 
 typedef struct esp_os_task_notify_s esp_os_task_notify_t;
 
-/* FreeRTOS compatibility defines */
-
-#define pdTRUE  1
-#define pdFALSE 0
 #define pdPASS  0
 #define portMAX_DELAY 0xfffffffful
 

@@ -819,10 +819,110 @@ void nuttx_exit_critical(void)
 
 /****************************************************************************
  * Task Management Implementation
+ *
+ * Per-task notification mechanism: each task created through
+ * esp_os_create_task_pinned_to_core gets its own semaphore entry in a
+ * fixed-size table keyed by PID.  This allows esp_os_task_notify_take()
+ * and esp_os_task_notify_give_from_isr() to target the correct task
+ * without sharing a single global semaphore.
+ *
+ * The table is protected with irqsave/restore so it can be safely accessed
+ * from both task and ISR contexts.
+ *
+ * Design rationale for alternatives considered:
+ *   - Single global sem (old approach): broken when >1 task uses the API.
+ *   - Per-task TLS + cross-task TLS access from ISR: not a NuttX-supported
+ *     pattern; fragile.
+ *   - TCB join_sem: reserved for pthread_join; must not be repurposed.
+ *   - Global (pid → sem) table (this implementation): ISR-safe, truly
+ *     per-task, no kernel internals abused.
+ *
  ****************************************************************************/
 
-static sem_t g_esp_timer_task_sem;
-static esp_os_task_handle_t g_esp_timer_task_handle = -1;
+/* Maximum number of tasks that may concurrently use esp_os_task_notify_*. */
+
+#define ESP_OS_TASK_NOTIFY_MAX_TASKS 8
+
+struct task_notify_entry_s
+{
+  volatile bool in_use;  /* Entry is valid and owns `sem`  */
+  pid_t         pid;     /* Owner task PID                 */
+  sem_t         sem;     /* Per-task counting semaphore    */
+};
+
+/* Zero-initialised at startup: in_use = false for all entries. */
+
+static struct task_notify_entry_s
+  g_task_notify[ESP_OS_TASK_NOTIFY_MAX_TASKS];
+
+/****************************************************************************
+ * Name: task_notify_find_locked
+ *
+ * Description:
+ *   Return the table entry for `pid`, or NULL if not found.
+ *   Caller MUST hold interrupts disabled (up_irq_save).
+ *
+ ****************************************************************************/
+
+static FAR struct task_notify_entry_s *
+task_notify_find_locked(pid_t pid)
+{
+  int i;
+
+  for (i = 0; i < ESP_OS_TASK_NOTIFY_MAX_TASKS; i++)
+    {
+      if (g_task_notify[i].in_use && g_task_notify[i].pid == pid)
+        {
+          return &g_task_notify[i];
+        }
+    }
+
+  return NULL;
+}
+
+/****************************************************************************
+ * Name: task_notify_register
+ *
+ * Description:
+ *   Allocate a table entry for `pid` and initialise its semaphore.
+ *   Safe to call from task context (not ISR).
+ *
+ * Returned Value:
+ *   Pointer to the new entry, or NULL if the table is full.
+ *
+ ****************************************************************************/
+
+static FAR struct task_notify_entry_s *
+task_notify_register(pid_t pid)
+{
+  irqstate_t flags;
+  sem_t sem;
+  int i;
+
+  /* Initialise the semaphore before taking the critical section so that we
+   * do not hold IRQs disabled during any allocation inside nxsem_init.
+   */
+
+  nxsem_init(&sem, 0, 0);
+
+  flags = up_irq_save();
+
+  for (i = 0; i < ESP_OS_TASK_NOTIFY_MAX_TASKS; i++)
+    {
+      if (!g_task_notify[i].in_use)
+        {
+          g_task_notify[i].pid  = pid;
+          g_task_notify[i].sem  = sem;   /* struct copy: sem is empty/clean */
+          g_task_notify[i].in_use = true; /* mark valid last – ISR sees this */
+
+          up_irq_restore(flags);
+          return &g_task_notify[i];
+        }
+    }
+
+  up_irq_restore(flags);
+  return NULL;
+}
 
 /* Wrapper to adapt FreeRTOS-style void(*)(void*) to NuttX int(*)(int, char**) */
 
@@ -834,7 +934,8 @@ struct task_wrapper_args_s
 
 static int task_wrapper_entry(int argc, FAR char *argv[])
 {
-  struct task_wrapper_args_s *wrapper_args = (struct task_wrapper_args_s *)argv[1];
+  struct task_wrapper_args_s *wrapper_args =
+    (struct task_wrapper_args_s *)argv[1];
 
   wrapper_args->func(wrapper_args->arg);
 
@@ -852,10 +953,7 @@ int esp_os_create_task_pinned_to_core(esp_os_task_function_t task_func,
 {
   pid_t pid;
   struct task_wrapper_args_s *wrapper_args;
-  char arg_str[32];
   char *argv[2];
-
-  /* Allocate wrapper args */
 
   wrapper_args = malloc(sizeof(struct task_wrapper_args_s));
   if (wrapper_args == NULL)
@@ -863,16 +961,13 @@ int esp_os_create_task_pinned_to_core(esp_os_task_function_t task_func,
       return -1;
     }
 
-  wrapper_args->func = (void (*)(void*))task_func;
-  wrapper_args->arg = arg;
-
-  /* Create args for kthread_create */
+  wrapper_args->func = (void (*)(void *))task_func;
+  wrapper_args->arg  = arg;
 
   argv[0] = (void *)wrapper_args;
   argv[1] = NULL;
 
-  pid = kthread_create(name, priority, stack_size,
-                       task_wrapper_entry, argv);
+  pid = kthread_create(name, priority, stack_size, task_wrapper_entry, argv);
   if (pid < 0)
     {
       free(wrapper_args);
@@ -889,9 +984,15 @@ int esp_os_create_task_pinned_to_core(esp_os_task_function_t task_func,
     }
 #endif
 
-  if (task_handle == &g_esp_timer_task_handle)
+  /* Pre-register the notification entry so that an ISR can post to this
+   * task's semaphore even before the task body calls notify_take for the
+   * first time.
+   */
+
+  if (task_notify_register(pid) == NULL)
     {
-      nxsem_init(&g_esp_timer_task_sem, 0, 0);
+      _warn("Task notify table full; notifications for '%s' may be lost\n",
+            name);
     }
 
   if (task_handle != NULL)
@@ -904,33 +1005,100 @@ int esp_os_create_task_pinned_to_core(esp_os_task_function_t task_func,
 
 void esp_os_task_delete(esp_os_task_handle_t handle)
 {
+  irqstate_t flags;
+  sem_t old_sem;
+  bool found = false;
+  int i;
+
   if (handle > 0)
     {
+      /* Clear the entry under IRQ lock so the slot is immediately reusable,
+       * then destroy a local copy of the semaphore outside the lock to avoid
+       * a race where task_notify_register re-uses the slot before we call
+       * nxsem_destroy on it.
+       */
+
+      flags = up_irq_save();
+
+      for (i = 0; i < ESP_OS_TASK_NOTIFY_MAX_TASKS; i++)
+        {
+          if (g_task_notify[i].in_use &&
+              g_task_notify[i].pid == (pid_t)handle)
+            {
+              old_sem = g_task_notify[i].sem;  /* save before release */
+              g_task_notify[i].in_use = false;
+              found = true;
+              break;
+            }
+        }
+
+      up_irq_restore(flags);
+
+      if (found)
+        {
+          nxsem_destroy(&old_sem);
+        }
+
       kthread_delete(handle);
     }
 }
 
 uint32_t esp_os_task_notify_take(bool clear_on_exit, uint32_t wait_ticks)
 {
+  FAR struct task_notify_entry_s *entry;
+  irqstate_t flags;
+  pid_t pid;
   int ret;
 
-  if (wait_ticks == 0xfffffffful)
+  pid = gettid();
+
+  /* Look up our own entry; register lazily for tasks not created through
+   * esp_os_create_task_pinned_to_core.
+   */
+
+  flags = up_irq_save();
+  entry = task_notify_find_locked(pid);
+  up_irq_restore(flags);
+
+  if (entry == NULL)
     {
-      ret = nxsem_wait(&g_esp_timer_task_sem);
+      entry = task_notify_register(pid);
+    }
+
+  if (entry == NULL)
+    {
+      _err("Task notify table full – cannot wait\n");
+      return 0;
+    }
+
+  /* Wait for a notification. */
+
+  if (wait_ticks == OS_PORT_MAX_DELAY)
+    {
+      ret = nxsem_wait(&entry->sem);
     }
   else
     {
       struct timespec abstime;
+      struct timespec ts;
+
       clock_gettime(CLOCK_REALTIME, &abstime);
-      abstime.tv_nsec += (wait_ticks * NSEC_PER_MSEC * 10);
+      clock_ticks2time(&ts, wait_ticks);
+      clock_timespec_add(&abstime, &ts, &abstime);
 
-      while (abstime.tv_nsec >= NSEC_PER_SEC)
+      ret = nxsem_timedwait(&entry->sem, &abstime);
+    }
+
+  /* Binary-semaphore semantics: drain any extra counts accumulated while
+   * this task was executing its callback.
+   */
+
+  if (ret == OK && clear_on_exit)
+    {
+      while (nxsem_trywait(&entry->sem) == OK)
         {
-          abstime.tv_sec++;
-          abstime.tv_nsec -= NSEC_PER_SEC;
+          /* drain */
         }
-
-      ret = nxsem_timedwait(&g_esp_timer_task_sem, &abstime);
     }
 
   return (ret == OK) ? 1 : 0;
@@ -939,7 +1107,22 @@ uint32_t esp_os_task_notify_take(bool clear_on_exit, uint32_t wait_ticks)
 int esp_os_task_notify_give_from_isr(esp_os_task_handle_t task,
                                       FAR int *higher_priority_woken)
 {
-  int ret = nxsem_post(&g_esp_timer_task_sem);
+  FAR struct task_notify_entry_s *entry;
+  irqstate_t flags;
+  int ret = -ENOENT;
+
+  flags = up_irq_save();
+  entry = task_notify_find_locked((pid_t)task);
+  up_irq_restore(flags);
+
+  if (entry != NULL)
+    {
+      ret = nxsem_post(&entry->sem);
+    }
+  else
+    {
+      _warn("notify_give_from_isr: no entry for task %d\n", (int)task);
+    }
 
   if (higher_priority_woken != NULL)
     {
