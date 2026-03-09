@@ -19,6 +19,7 @@
 #include "esp_private/startup_internal.h"
 #include "esp_private/esp_timer_private.h"
 #include "esp_private/system_internal.h"
+#include "esp_private/critical_section.h"
 #include "sdkconfig.h"
 
 #ifdef CONFIG_ESP_TIMER_PROFILING

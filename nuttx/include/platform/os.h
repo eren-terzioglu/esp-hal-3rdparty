@@ -34,8 +34,6 @@
 #    include "esp32_rt_timer.h"
 #    define esp_timer_get_time rt_timer_time_us
 #  elif defined(CONFIG_IDF_TARGET_ESP32S3)
-#    include "esp32s3_rt_timer.h"
-#    define esp_timer_get_time esp32s3_rt_timer_time_us
 #  elif defined(CONFIG_IDF_TARGET_ESP32S2)
 #    include "esp32s2_rt_timer.h"
 #    define esp_timer_get_time rt_timer_time_us
