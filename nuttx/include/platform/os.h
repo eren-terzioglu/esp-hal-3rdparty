@@ -29,26 +29,17 @@
 #include "esp_heap_caps.h"
 #include "esp_err.h"
 
-#ifdef __NuttX__
-#  ifdef CONFIG_IDF_TARGET_ESP32
-#    include "esp32_rt_timer.h"
-#    define esp_timer_get_time rt_timer_time_us
-#  elif defined(CONFIG_IDF_TARGET_ESP32S3)
-#  elif defined(CONFIG_IDF_TARGET_ESP32S2)
-#    include "esp32s2_rt_timer.h"
-#    define esp_timer_get_time rt_timer_time_us
-#  else
-#    include "esp_hr_timer.h"
-#    define esp_timer_get_time esp_hr_timer_time_us
-#    define esp_timer_create esp_hr_timer_create
-#    define esp_timer_start_once esp_hr_timer_start_once
-#    define esp_timer_start_periodic esp_hr_timer_start_periodic
-#    define esp_timer_stop esp_hr_timer_stop
-#    define esp_timer_delete esp_hr_timer_delete
-#    define esp_timer_private_set esp_hr_timer_set
-#    define esp_timer_private_lock esp_hr_timer_lock
-#    define esp_timer_private_unlock esp_hr_timer_unlock
-#  endif
+#ifdef CONFIG_IDF_TARGET_ARCH_RISCV
+#  include "esp_hr_timer.h"
+#  define esp_timer_get_time esp_hr_timer_time_us
+#  define esp_timer_create esp_hr_timer_create
+#  define esp_timer_start_once esp_hr_timer_start_once
+#  define esp_timer_start_periodic esp_hr_timer_start_periodic
+#  define esp_timer_stop esp_hr_timer_stop
+#  define esp_timer_delete esp_hr_timer_delete
+#  define esp_timer_private_set esp_hr_timer_set
+#  define esp_timer_private_lock esp_hr_timer_lock
+#  define esp_timer_private_unlock esp_hr_timer_unlock
 #endif
 
 /****************************************************************************
