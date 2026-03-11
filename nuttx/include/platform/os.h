@@ -82,6 +82,10 @@
 #define OS_SPINLOCK_TYPE            rspinlock_t
 #define OS_SPINLOCK_INITIALIZER     RSPINLOCK_INITIALIZER
 #define OS_SPINLOCK_INIT(lock)      esp_os_spinlock_initialize(lock)
+#define OS_SET_INTERRUPT_MASK_FROM_ISR          up_irq_save
+#define OS_CLEAR_INTERRUPT_MASK_FROM_ISR(flags) up_irq_restore(flags)
+#define OS_SET_INTERRUPT_MASK_FROM              up_irq_save
+#define OS_CLEAR_INTERRUPT_MASK_FROM(flags)     up_irq_restore(flags)
 
 #if OS_SPINLOCK == 1
 #  define OS_ENTER_CRITICAL_WITH_LOCK(lock)      nuttx_enter_critical(lock)

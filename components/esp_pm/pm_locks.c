@@ -10,7 +10,7 @@
 #include "esp_pm.h"
 #include "esp_system.h"
 #include "sys/queue.h"
-#include "freertos/FreeRTOS.h"
+#include "platform/os.h"
 #include "esp_private/pm_impl.h"
 #include "esp_timer.h"
 #include "sdkconfig.h"
@@ -23,7 +23,7 @@ typedef struct esp_pm_lock {
     const char* name;               /*!< used to identify the lock */
     SLIST_ENTRY(esp_pm_lock) next;  /*!< linked list pointer */
     size_t count;                   /*!< lock count */
-    portMUX_TYPE spinlock;          /*!< spinlock used when operating on 'count' */
+    OS_SPINLOCK_TYPE spinlock;      /*!< spinlock used when operating on 'count' */
 #ifdef WITH_PROFILING
     pm_time_t last_taken;           /*!< time what the lock was taken (valid if count > 0) */
     pm_time_t time_held;            /*!< total time the lock was taken.
@@ -64,7 +64,7 @@ esp_err_t esp_pm_lock_create(esp_pm_lock_type_t lock_type, int arg,
     new_lock->arg = arg;
     new_lock->mode = esp_pm_impl_get_mode(lock_type, arg);
     new_lock->name = name;
-    new_lock->spinlock = (portMUX_TYPE) portMUX_INITIALIZER_UNLOCKED;
+    esp_os_spinlock_initialize(&new_lock->spinlock);
     *out_handle = new_lock;
 
     _lock_acquire(&s_list_lock);
@@ -103,7 +103,7 @@ esp_err_t IRAM_ATTR esp_pm_lock_acquire(esp_pm_lock_handle_t handle)
         return ESP_ERR_INVALID_ARG;
     }
 
-    portENTER_CRITICAL_SAFE(&handle->spinlock);
+    OS_ENTER_CRITICAL_NO_LOCK_SAFE();
     if (handle->count++ == 0) {
         pm_time_t now = 0;
 #ifdef WITH_PROFILING
@@ -115,7 +115,7 @@ esp_err_t IRAM_ATTR esp_pm_lock_acquire(esp_pm_lock_handle_t handle)
         handle->times_taken++;
 #endif
     }
-    portEXIT_CRITICAL_SAFE(&handle->spinlock);
+    OS_EXIT_CRITICAL_NO_LOCK_SAFE();
     return ESP_OK;
 }
 
@@ -129,7 +129,7 @@ esp_err_t IRAM_ATTR esp_pm_lock_release(esp_pm_lock_handle_t handle)
         return ESP_ERR_INVALID_ARG;
     }
     esp_err_t ret = ESP_OK;
-    portENTER_CRITICAL_SAFE(&handle->spinlock);
+    OS_ENTER_CRITICAL_NO_LOCK_SAFE();
     if (handle->count == 0) {
         ret = ESP_ERR_INVALID_STATE;
         goto out;
@@ -143,7 +143,7 @@ esp_err_t IRAM_ATTR esp_pm_lock_release(esp_pm_lock_handle_t handle)
         esp_pm_impl_switch_mode(handle->mode, MODE_UNLOCK, now);
     }
 out:
-    portEXIT_CRITICAL_SAFE(&handle->spinlock);
+    OS_EXIT_CRITICAL_NO_LOCK_SAFE();
     return ret;
 }
 
@@ -197,7 +197,7 @@ esp_err_t esp_pm_lock_get_stats(esp_pm_lock_handle_t handle, esp_pm_lock_instanc
     stats->time_held = 0;
 #endif
 
-    portENTER_CRITICAL(&handle->spinlock);
+    OS_ENTER_CRITICAL_NO_LOCK();
     stats->acquired = handle->count;
 #ifdef WITH_PROFILING
     stats->times_taken = handle->times_taken;
@@ -208,7 +208,7 @@ esp_err_t esp_pm_lock_get_stats(esp_pm_lock_handle_t handle, esp_pm_lock_instanc
         stats->time_held += now - handle->last_taken;
     }
 #endif
-    portEXIT_CRITICAL(&handle->spinlock);
+    OS_EXIT_CRITICAL_NO_LOCK();
 
     return ESP_OK;
 }
@@ -243,7 +243,7 @@ esp_err_t esp_pm_dump_locks(FILE* stream)
         size_t len = sizeof(line);
         size_t cb;
 
-        portENTER_CRITICAL(&it->spinlock);
+        OS_ENTER_CRITICAL_NO_LOCK();
         if (it->name == NULL) {
             cb = snprintf(buf, len, "lock@%p ", it);
         } else {
@@ -264,7 +264,7 @@ esp_err_t esp_pm_dump_locks(FILE* stream)
 #else
         snprintf(buf, len, "%-14s  %-5d  %-8d\n", s_lock_type_names[it->type], it->arg, it->count);
 #endif // WITH_PROFILING
-        portEXIT_CRITICAL(&it->spinlock);
+        OS_EXIT_CRITICAL_NO_LOCK();
         fputs(line, stream);
     }
     _lock_release(&s_list_lock);
