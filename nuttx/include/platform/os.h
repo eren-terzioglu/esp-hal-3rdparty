@@ -30,16 +30,11 @@
 #include "esp_err.h"
 
 #ifdef CONFIG_IDF_TARGET_ARCH_RISCV
+/* RISC-V: esp_timer API is implemented by the adapter layer in platform/os.c,
+ * which wraps esp_hr_timer (NuttX) and adapts arguments and return codes.
+ * esp_hr_timer.h is included only for internal use by the adapter.
+ */
 #  include "esp_hr_timer.h"
-#  define esp_timer_get_time esp_hr_timer_time_us
-#  define esp_timer_create esp_hr_timer_create
-#  define esp_timer_start_once esp_hr_timer_start_once
-#  define esp_timer_start_periodic esp_hr_timer_start_periodic
-#  define esp_timer_stop esp_hr_timer_stop
-#  define esp_timer_delete esp_hr_timer_delete
-#  define esp_timer_private_set esp_hr_timer_set
-#  define esp_timer_private_lock esp_hr_timer_lock
-#  define esp_timer_private_unlock esp_hr_timer_unlock
 #endif
 
 /****************************************************************************
@@ -181,6 +176,29 @@ typedef uint32_t TickType_t;
 extern "C"
 {
 #endif
+
+/****************************************************************************
+ * Name: esp_errno_to_esp_err
+ *
+ * Description:
+ *   Convert a NuttX/posix errno-style return value (0 for success, negated
+ *   errno on failure) to an ESP-IDF esp_err_t. Use this when wrapping NuttX
+ *   or other POSIX-style APIs that return int with 0 or -errno.
+ *
+ * Input Parameters:
+ *   errno_value - Return value from a NuttX/POSIX API: 0 for success, or
+ *                 a negated errno value (e.g. -EINVAL, -ENOMEM) on failure.
+ *
+ * Returned Value:
+ *   ESP_OK on success (errno_value == 0).
+ *   ESP_ERR_INVALID_ARG when errno_value == -EINVAL.
+ *   ESP_ERR_NO_MEM when errno_value == -ENOMEM.
+ *   ESP_ERR_INVALID_STATE when errno_value == -EALREADY or -EBUSY.
+ *   ESP_FAIL for any other error.
+ *
+ ****************************************************************************/
+
+esp_err_t esp_errno_to_esp_err(int errno_value);
 
 /* IRQ allocation functions */
 
