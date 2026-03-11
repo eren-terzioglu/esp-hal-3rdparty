@@ -13,7 +13,9 @@
 
 #include <debug.h>
 #include <errno.h>
+#include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <clock/clock.h>
 
 #include <nuttx/mutex.h>
@@ -25,8 +27,8 @@
 #include <semaphore.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <nuttx/kthread.h>
 #include <nuttx/sched.h>
+#include <nuttx/mm/mm.h>
 
 #include "sdkconfig.h"
 
@@ -1047,12 +1049,21 @@ struct task_wrapper_args_s
 
 static int task_wrapper_entry(int argc, FAR char *argv[])
 {
-  struct task_wrapper_args_s *wrapper_args =
-    (struct task_wrapper_args_s *)argv[1];
+  FAR struct task_wrapper_args_s *wrapper_args;
+  uintptr_t ptr;
+
+  /* argv[0] is the task name; argv[1] is the wrapper_args pointer as string */
+
+  if (argc < 2 || argv[1] == NULL)
+    {
+      return -EINVAL;
+    }
+
+  ptr = (uintptr_t)strtoul(argv[1], NULL, 0);
+  wrapper_args = (FAR struct task_wrapper_args_s *)ptr;
 
   wrapper_args->func(wrapper_args->arg);
-
-  free(wrapper_args);
+  kmm_free(wrapper_args);
   return 0;
 }
 
@@ -1064,11 +1075,13 @@ int esp_os_create_task_pinned_to_core(esp_os_task_function_t task_func,
                                       esp_os_task_handle_t *task_handle,
                                       int core_id)
 {
-  pid_t pid;
-  struct task_wrapper_args_s *wrapper_args;
-  char *argv[2];
+  FAR struct tcb_s *tcb;
+  FAR struct task_wrapper_args_s *wrapper_args;
+  FAR char *argv[2];
+  char ptr_buf[32];
+  int ret;
 
-  wrapper_args = malloc(sizeof(struct task_wrapper_args_s));
+  wrapper_args = kmm_zalloc(sizeof(struct task_wrapper_args_s));
   if (wrapper_args == NULL)
     {
       return -1;
@@ -1077,13 +1090,26 @@ int esp_os_create_task_pinned_to_core(esp_os_task_function_t task_func,
   wrapper_args->func = (void (*)(void *))task_func;
   wrapper_args->arg  = arg;
 
-  argv[0] = (void *)wrapper_args;
+  snprintf(ptr_buf, sizeof(ptr_buf), "%p", (FAR void *)wrapper_args);
+  argv[0] = ptr_buf;
   argv[1] = NULL;
 
-  pid = kthread_create(name, priority, stack_size, task_wrapper_entry, argv);
-  if (pid < 0)
+  tcb = kmm_zalloc(sizeof(struct tcb_s));
+  if (tcb == NULL)
     {
-      free(wrapper_args);
+      kmm_free(wrapper_args);
+      return -1;
+    }
+
+  tcb->flags = TCB_FLAG_TTYPE_KERNEL | TCB_FLAG_FREE_TCB;
+
+  ret = nxtask_init(tcb, name, priority,
+                    NULL, stack_size,
+                    task_wrapper_entry, argv, NULL, NULL);
+  if (ret < 0)
+    {
+      kmm_free(wrapper_args);
+      kmm_free(tcb);
       return -1;
     }
 
@@ -1093,16 +1119,11 @@ int esp_os_create_task_pinned_to_core(esp_os_task_function_t task_func,
       cpu_set_t cpuset;
       CPU_ZERO(&cpuset);
       CPU_SET(core_id, &cpuset);
-      sched_setaffinity(pid, sizeof(cpu_set_t), &cpuset);
+      tcb->affinity = cpuset;
     }
 #endif
 
-  /* Pre-register the notification entry so that an ISR can post to this
-   * task's semaphore even before the task body calls notify_take for the
-   * first time.
-   */
-
-  if (task_notify_register(pid) == NULL)
+  if (task_notify_register(tcb->pid) == NULL)
     {
       _warn("esp_os_create_task: out of memory for notify entry '%s'\n",
             name);
@@ -1110,9 +1131,10 @@ int esp_os_create_task_pinned_to_core(esp_os_task_function_t task_func,
 
   if (task_handle != NULL)
     {
-      *task_handle = pid;
+      *task_handle = (esp_os_task_handle_t)tcb->pid;
     }
 
+  nxtask_activate(tcb);
   return 0;
 }
 
@@ -1161,7 +1183,7 @@ void esp_os_task_delete(esp_os_task_handle_t handle)
           kmm_free(entry);
         }
 
-      kthread_delete(handle);
+      nxtask_delete((pid_t)handle);
     }
 }
 
