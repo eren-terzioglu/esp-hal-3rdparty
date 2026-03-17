@@ -75,6 +75,7 @@
 #define OS_TASK_DELAY(ticks)        esp_os_task_delay_adapter(ticks)
 #define OS_SCHEDULER_RUNNING()      OSINIT_OS_READY()
 #define OS_TICK_PERIOD_MS           (CONFIG_USEC_PER_TICK / 1000)
+#define OS_TICK_PERIOD_US           (CONFIG_USEC_PER_TICK)
 #define OS_IN_ISR()                 up_interrupt_context()
 #define OS_TASK_PRIO_MAX            (SCHED_PRIORITY_MAX)
 #define OS_TASK_PRIO_MIN            (SCHED_PRIORITY_MIN)
@@ -102,6 +103,10 @@
 #  define OS_ENTER_CRITICAL_NO_LOCK_SAFE()       nuttx_enter_critical()
 #  define OS_EXIT_CRITICAL_NO_LOCK_SAFE()        nuttx_exit_critical()
 #endif
+
+/* Expected idle time before sleep in ticks */
+
+#define configEXPECTED_IDLE_TIME_BEFORE_SLEEP    (800 / OS_TICK_PERIOD_US)
 
 /* FreeRTOS compatibility macros for NuttX. */
 
@@ -282,6 +287,8 @@ esp_os_task_handle_t esp_os_task_get_current_handle(void);
 void esp_os_task_delay_ms(uint32_t ms);
 
 uint32_t esp_os_task_get_tick_count(void);
+
+void esp_os_application_sleep(void);
 
 #ifdef __cplusplus
 }

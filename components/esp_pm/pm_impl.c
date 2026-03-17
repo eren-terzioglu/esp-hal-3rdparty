@@ -831,11 +831,10 @@ static inline void IRAM_ATTR other_core_should_skip_light_sleep(int core_id)
 #endif
 }
 
-#ifndef __NuttX__
 // Adjust RTOS tick count based on the amount of time spent in sleep.
 FORCE_INLINE_ATTR void pm_step_tick(int64_t slept_us, TickType_t xExpectedIdleTime)
 {
-    uint32_t slept_ticks = slept_us / (portTICK_PERIOD_MS * 1000LL);
+    uint32_t slept_ticks = slept_us / (OS_TICK_PERIOD_US);
     if (slept_ticks) {
 #if CONFIG_PM_LIGHTSLEEP_TICK_OVERFLOW_PROTECTION
         /* Limit slept_ticks when oversleep is within tolerance to prevent assertion failure */
@@ -849,11 +848,13 @@ FORCE_INLINE_ATTR void pm_step_tick(int64_t slept_us, TickType_t xExpectedIdleTi
                      (uint32_t)xExpectedIdleTime, slept_ticks);
         }
         /* Adjust RTOS tick count based on the amount of time spent in sleep */
-        vTaskStepTick(slept_ticks);
+        /* TODO: The following line is commented out because it is pending verificarion/validation on NuttX */
+        /*        What function should we use to adjust the tick count?*/
+        // vTaskStepTick(slept_ticks);
 
 #ifdef CONFIG_FREERTOS_SYSTICK_USES_CCOUNT
         /* Trigger tick interrupt, since sleep time was longer
-        * than portTICK_PERIOD_MS. Note that setting INTSET does not
+        * than OS_TICK_PERIOD_MS. Note that setting INTSET does not
         * work for timer interrupt, and changing CCOMPARE would clear
         * the interrupt flag.
         */
@@ -876,7 +877,7 @@ void vApplicationSleep( TickType_t xExpectedIdleTime )
         int64_t next_esp_timer_alarm = esp_timer_get_next_alarm_for_wake_up();
         int64_t now = esp_timer_get_time();
         int64_t time_until_next_alarm = next_esp_timer_alarm - now;
-        int64_t wakeup_delay_us = portTICK_PERIOD_MS * 1000LL * xExpectedIdleTime;
+        int64_t wakeup_delay_us = OS_TICK_PERIOD_MS * 1000LL * xExpectedIdleTime;
         int64_t sleep_time_us = MIN(wakeup_delay_us, time_until_next_alarm);
         int64_t slept_us = 0;
 #if CONFIG_PM_LIGHT_SLEEP_CALLBACKS
@@ -884,7 +885,7 @@ void vApplicationSleep( TickType_t xExpectedIdleTime )
         esp_pm_execute_enter_sleep_callbacks(sleep_time_us);
         sleep_time_us -= (esp_cpu_get_cycle_count() - cycle) / (esp_clk_cpu_freq() / 1000000ULL);
 #endif
-        if (sleep_time_us >= configEXPECTED_IDLE_TIME_BEFORE_SLEEP * portTICK_PERIOD_MS * 1000LL) {
+        if (sleep_time_us >= configEXPECTED_IDLE_TIME_BEFORE_SLEEP * OS_TICK_PERIOD_MS * 1000LL) {
             esp_sleep_enable_timer_wakeup(sleep_time_us - LIGHT_SLEEP_EARLY_WAKEUP_US);
             /* Enter sleep */
             ESP_PM_TRACE_ENTER(SLEEP, core_id);
@@ -914,7 +915,6 @@ void vApplicationSleep( TickType_t xExpectedIdleTime )
     esp_os_exit_critical(&s_switch_lock);
 }
 #endif //CONFIG_FREERTOS_USE_TICKLESS_IDLE
-#endif
 
 #ifdef WITH_PROFILING
 void esp_pm_impl_dump_stats(FILE* out)

@@ -38,6 +38,10 @@
 
 #include "platform/os.h"
 
+#if CONFIG_IDF_TARGET_ARCH_XTENSA
+unsigned _xt_tick_divisor = 0;  /* cached number of cycles per tick */
+#endif
+
 /****************************************************************************
  * Name: esp_errno_to_esp_err
  *
@@ -258,6 +262,8 @@ static esp_err_t esp_os_queue_send_generic(esp_os_queue_handle_t queue,
                                            int prio);
 
 void esp_os_include_impl(void);
+extern uint32_t up_get_idletime(void);
+extern void vApplicationSleep(TickType_t xExpectedIdleTime);
 
 /****************************************************************************
  * Private Functions
@@ -859,6 +865,31 @@ void esp_os_scheduler_enable(void)
 bool IRAM_ATTR esp_os_scheduler_started(void)
 {
   return OSINIT_OS_READY();
+}
+
+/****************************************************************************
+ * Name: esp_os_application_sleep
+ *
+ * Description:
+ *   Convert NuttX idle time (microseconds) into OS ticks and forward it to
+ *   vApplicationSleep(), which expects the idle duration in tick units.
+ *
+ ****************************************************************************/
+
+void esp_os_application_sleep(void)
+{
+#ifdef CONFIG_SCHED_TICKLESS
+  uint32_t idle_us;
+  TickType_t idle_ticks;
+
+  idle_us = up_get_idletime();
+  idle_ticks = (TickType_t)(idle_us / OS_TICK_PERIOD_US);
+
+  if (idle_ticks > 0)
+    {
+      vApplicationSleep(idle_ticks);
+    }
+#endif
 }
 
 /****************************************************************************
